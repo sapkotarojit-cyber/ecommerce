@@ -19,17 +19,70 @@ class PageController extends Controller
         return view('frontend.home', compact('products'));
     }
 
-    public function products()
+    public function support()
+{
+    return view('frontend.support');
+}
+
+public function about()
+{
+    return view('frontend.about');
+}
+
+    public function products(Request $request)
     {
-        $products = Product::with(['dokan', 'varients'])->latest()->get();
-        return view('product.index', compact('products'));
+        $query = Product::with(['dokan', 'varients']);
+
+        // Filter by Category
+        if ($request->filled('category')) {
+            $query->where('category', $request->input('category'));
+        }
+
+        // Filter by Price Range (checks against variant prices)
+        if ($request->filled('min_price') || $request->filled('max_price')) {
+            $query->whereHas('varients', function ($q) use ($request) {
+                if ($request->filled('min_price')) {
+                    $q->where('price', '>=', $request->input('min_price'));
+                }
+                if ($request->filled('max_price')) {
+                    $q->where('price', '<=', $request->input('max_price'));
+                }
+            });
+        }
+
+        // Apply Sorting
+        switch ($request->input('sort')) {
+            case 'price_asc':
+                $query->whereHas('varients')
+                    ->join('product_varients', 'products.id', '=', 'product_varients.product_id')
+                    ->orderBy('product_varients.price', 'asc')
+                    ->select('products.*');
+                break;
+            case 'price_desc':
+                $query->whereHas('varients')
+                    ->join('product_varients', 'products.id', '=', 'product_varients.product_id')
+                    ->orderBy('product_varients.price', 'desc')
+                    ->select('products.*');
+                break;
+            case 'newest':
+            default:
+                $query->latest('products.created_at');
+                break;
+        }
+
+        // Paginate results and append URL parameters
+        $products = $query->paginate(12)->withQueryString();
+
+        return view('frontend.product.index', compact('products'));
     }
 
     public function product($id)
     {
         $product = Product::with(['dokan', 'varients'])->findOrFail($id);
-        return view('product.show', compact('product'));
+        return view('frontend.product.show', compact('product'));
     }
+
+
 
     public function dokan_registration()
     {
@@ -47,26 +100,26 @@ class PageController extends Controller
             'terms' => 'required|accepted',
         ]);
 
-         try {
-        // Handle logo upload
-        $file = $request->file('logo');
-        $logoPath = null;
-        if ($file) {
-            $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9.]/', '', $file->getClientOriginalName());
-            $file->move(public_path('storage/vendor-logos'), $fileName);
-            $logoPath = 'vendor-logos/' . $fileName;
-        }
-             // Create dokan record
-        $dokan = new Dokan();
-        $dokan->user_id = Auth::id(); // ✅ Save user_id
-        $dokan->company_name = $validated['company_name'];
-        $dokan->email = $validated['email'];
-        $dokan->reg_no = $validated['reg_no'];
-        $dokan->contact_number = $validated['contact_number'];
-        $dokan->logo = $logoPath;
-        $dokan->status = Dokan::STATUS_PENDING;
-        $dokan->save();
+        try {
+            // Handle logo upload
+            $file = $request->file('logo');
+            $logoPath = null;
+            if ($file) {
+                $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9.]/', '', $file->getClientOriginalName());
+                $file->move(public_path('storage/vendor-logos'), $fileName);
+                $logoPath = 'vendor-logos/' . $fileName;
+            }
 
+            // Create dokan record
+            $dokan = new Dokan();
+            $dokan->user_id = Auth::id(); // ✅ Save user_id
+            $dokan->company_name = $validated['company_name'];
+            $dokan->email = $validated['email'];
+            $dokan->reg_no = $validated['reg_no'];
+            $dokan->contact_number = $validated['contact_number'];
+            $dokan->logo = $logoPath;
+            $dokan->status = Dokan::STATUS_PENDING;
+            $dokan->save();
 
             // Send email notification to admin
             try {

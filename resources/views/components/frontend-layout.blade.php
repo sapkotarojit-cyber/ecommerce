@@ -1,22 +1,20 @@
-<!-- resources/views/components/frontend-layout.blade.php -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>MarketHub - Multi-Vendor Marketplace</title>
-    <meta name="description" content="Shop from thousands of trusted vendors on MarketHub">
-    @vite('resources/css/app.css')
-    @vite('resources/js/app.js')
+    <title>Empire Innovation - Multi-Seller Marketplace</title>
+    <meta name="description" content="Shop medical and surgical supplies from thousands of trusted sellers on Empire Innovation">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>
         /* Custom CSS Variables */
         :root {
-            --color-primary: #4F46E5;
-            --color-primary-dark: #4338CA;
-            --color-secondary: #F59E0B;
-            --color-secondary-dark: #D97706;
+            --color-primary: #0F1A3A;
+            --color-primary-dark: #0A122A;
+            --color-secondary: #C9A84C;
+            --color-secondary-dark: #B08E35;
             --color-accent: #10B981;
             --color-dark: #1F2937;
             --color-light: #F9FAFB;
@@ -106,29 +104,36 @@
 
         .btn-primary {
             transition: all 0.3s ease;
+            background-color: var(--color-primary);
+            color: #ffffff;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(15, 26, 58, 0.3);
+            background-color: var(--color-primary-dark);
         }
 
-        /* Gradient Text */
+        /* Gradient Backgrounds & Text */
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f1a3a 0%, #1e293b 100%);
+        }
+
         .gradient-text {
-            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            background: linear-gradient(135deg, #0f1a3a 0%, #c9a84c 100%);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
         }
 
-        /* Vendor Badge */
-        .vendor-badge {
+        /* Seller Badge */
+        .seller-badge {
             position: relative;
             overflow: hidden;
         }
 
-        .vendor-badge::before {
-            content: 'Verified Vendor';
+        .seller-badge::before {
+            content: 'Verified Seller';
             position: absolute;
             top: 10px;
             right: -35px;
@@ -176,7 +181,7 @@
             background: var(--color-primary-dark);
         }
 
-        /* Loading Skeleton */
+        /* Skeleton Loading */
         .skeleton {
             background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
             background-size: 200% 100%;
@@ -184,15 +189,10 @@
         }
 
         @keyframes shimmer {
-            0% {
-                background-position: -200% 0;
-            }
-            100% {
-                background-position: 200% 0;
-            }
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
         }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .mobile-stack {
                 flex-direction: column;
@@ -200,11 +200,11 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 font-sans antialiased">
+<body class="bg-gray-50 font-sans antialiased min-h-screen flex flex-col justify-between">
 
     <x-frontend-header/>
 
-    <main class="min-h-screen">
+    <main class="mb-auto">
         {{ $slot }}
     </main>
 
@@ -217,7 +217,7 @@
             const mobileMenuButton = document.getElementById('mobile-menu-button');
             const mobileMenu = document.getElementById('mobile-menu');
 
-            if(mobileMenuButton && mobileMenu) {
+            if (mobileMenuButton && mobileMenu) {
                 mobileMenuButton.addEventListener('click', () => {
                     mobileMenu.classList.toggle('hidden');
                 });
@@ -238,11 +238,11 @@
                 });
             });
 
-            // Vendor application modal trigger
-            const applyButtons = document.querySelectorAll('.apply-vendor');
+            // Seller registration modal trigger
+            const applyButtons = document.querySelectorAll('.apply-seller');
             applyButtons.forEach(button => {
                 button.addEventListener('click', function() {
-                    alert('Vendor application form will open here');
+                    window.location.href = "{{ route('dokan_registration') }}";
                 });
             });
         });

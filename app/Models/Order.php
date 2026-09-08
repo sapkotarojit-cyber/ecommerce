@@ -6,9 +6,31 @@ use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
+    protected $fillable = [
+        'user_id',
+        'dokan_id',
+        'shipping_address_id',
+        'total_amount',
+        'status',
+        'payment_method',
+        'payment_status',
+        'tracking_number',
+    ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($order) {
+            if (empty($order->tracking_number)) {
+                $order->tracking_number = 'ORD-' . strtoupper(uniqid());
+            }
+        });
+    }
+
     public function user()
     {
-         return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class);
     }
 
     public function dokan()
@@ -25,6 +47,4 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
-
-
 }
