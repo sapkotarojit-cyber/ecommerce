@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Dokans\Schemas;
 
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -13,25 +12,26 @@ class DokanForm
     {
         return $schema
             ->components([
+                TextInput::make('user_id')
+                    ->numeric(),
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()
                     ->required(),
-                // TextInput::make('password')
-                //     ->password()
-                //     ->default(null),
+                TextInput::make('password')
+                    ->password(),
                 TextInput::make('company_name')
                     ->required(),
-                    TextInput::make('reg_no')
+                TextInput::make('logo')
                     ->required(),
-                    TextInput::make('contact_number')
+                TextInput::make('reg_no')
                     ->required(),
-                    Select::make('status')
+                TextInput::make('contact_number')
+                    ->required(),
+                Select::make('status')
                     ->options(['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected'])
                     ->default('pending')
                     ->required(),
-                    FileUpload::make('logo')
-                        ->required(),
             ]);
     }
 }

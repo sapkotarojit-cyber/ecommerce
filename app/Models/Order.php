@@ -38,11 +38,22 @@ class Order extends Model
         return $this->belongsTo(Dokan::class);
     }
 
-    public function shipping_address()
+    public function shippingAddress()
     {
-        return $this->belongsTo(ShippingAddress::class);
+        return $this->belongsTo(ShippingAddress::class, 'shipping_address_id');
     }
 
+    public function shipping_address()
+    {
+        return $this->belongsTo(ShippingAddress::class, 'shipping_address_id');
+    }
+
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
+    // Alias for orderItems to prevent relation not found exceptions
     public function order_items()
     {
         return $this->hasMany(OrderItem::class);

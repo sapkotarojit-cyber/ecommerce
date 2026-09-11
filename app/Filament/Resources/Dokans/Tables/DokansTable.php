@@ -14,13 +14,16 @@ class DokansTable
     {
         return $table
             ->columns([
+                TextColumn::make('user_id')
+                    ->numeric()
+                    ->sortable(),
                 TextColumn::make('email')
                     ->label('Email address')
                     ->searchable(),
                 TextColumn::make('company_name')
                     ->searchable(),
-                // TextColumn::make('logo')
-                //     ->searchable(),
+                TextColumn::make('logo')
+                    ->searchable(),
                 TextColumn::make('reg_no')
                     ->searchable(),
                 TextColumn::make('contact_number')

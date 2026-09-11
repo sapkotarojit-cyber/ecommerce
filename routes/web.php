@@ -17,16 +17,18 @@ use App\Http\Controllers\Vendor\ProductController;
 */
 
 // ============================================
-/// Public Routes
+// Public Routes
+// ============================================
 Route::get('/', [PageController::class, 'home'])->name('home');
-Route::get('/about', [PageController::class, 'about'])->name('about'); // Added About Us Route
+Route::get('/about', [PageController::class, 'about'])->name('about');
 Route::get('dokan-registration', [PageController::class, 'dokan_registration'])->name('dokan_registration');
 Route::post('dokan-registration', [PageController::class, 'dokan_registration_submit'])->name('dokan_registration_submit');
 Route::get('/products', [PageController::class, 'products'])->name('products');
+
+// Single route definition mapped to 'product' (used by Blade views)
 Route::get('/product/{id}', [PageController::class, 'product'])->name('product');
+
 Route::get('/support', [PageController::class, 'support'])->name('support');
-
-
 
 // Public Track Order Routes
 Route::get('/track-order', [OrderController::class, 'trackForm'])->name('orders.track');
@@ -69,13 +71,14 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{address}/set-default', [ShippingAddressController::class, 'setDefault'])->name('set-default');
     });
 
-    // Authenticated Cart Actions
+   // Authenticated Cart Actions
     Route::prefix('cart')->name('cart.')->group(function () {
         Route::post('/add', [CartController::class, 'add'])->name('add');
-        Route::patch('/{id}', [CartController::class, 'update'])->name('update');
-        Route::delete('/{id}', [CartController::class, 'destroy'])->name('destroy');
-        Route::delete('/clear', [CartController::class, 'clear'])->name('clear');
+        Route::post('/buy-now', [CartController::class, 'buyNow'])->name('buy-now');
+        Route::post('/clear', [CartController::class, 'clear'])->name('clear');
         Route::get('/count', [CartController::class, 'count'])->name('count');
+        Route::match(['post', 'patch'], '/{id}', [CartController::class, 'update'])->name('update');
+        Route::delete('/{id}', [CartController::class, 'destroy'])->name('destroy');
     });
 
     // Order Routes
@@ -87,4 +90,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');
     });
+
+    // Inside Route::middleware('auth')->group(...) -> Order Routes section:
+Route::get('/bank-transfer/pay', [OrderController::class, 'bankPaymentPage'])->name('bank.pay');
 });
+
+// ============================================
+// PAYMENT GATEWAY CALLBACK ROUTES (CSRF Exempt)
+// ============================================
+Route::prefix('payment/esewa')->name('esewa.')->group(function () {
+    Route::match(['get', 'post'], '/success', [OrderController::class, 'esewaSuccess'])->name('success')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+    Route::get('/failure', [OrderController::class, 'esewaFailure'])->name('failure');
+});
+
+Route::match(['get', 'post'], '/payment/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+Route::match(['get', 'post'], '/payment/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');
+
+// Bank Payment Routes (Make sure Route:: prefix is included here)
+Route::get('/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success');
+Route::get('/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');

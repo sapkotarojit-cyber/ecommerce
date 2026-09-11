@@ -28,10 +28,54 @@
     </div>
 
     @if (isset($order))
-        <div class="bg-white p-6 rounded-lg shadow-md border">
-            <h2 class="text-xl font-bold mb-4">Order Details #{{ $order->id }}</h2>
-            <p class="text-sm text-gray-600 mb-2"><strong>Tracking Number:</strong> {{ $order->tracking_number ?? 'N/A' }}</p>
-            <p class="text-sm text-gray-600 mb-2"><strong>Status:</strong> <span class="capitalize font-semibold">{{ $order->status ?? 'Processing' }}</span></p>
+        <div class="bg-white p-6 rounded-lg shadow-md border space-y-6">
+            <div class="flex justify-between items-center border-b pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Order Details #{{ $order->id }}</h2>
+                    <p class="text-sm text-gray-500">Placed on {{ $order->created_at->format('M d, Y h:i A') }}</p>
+                </div>
+                <span class="px-3 py-1 text-sm font-semibold rounded-full bg-indigo-50 text-indigo-600 capitalize">
+                    {{ $order->status ?? 'Processing' }}
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
+                <div>
+                    <p class="text-gray-500 font-medium">Tracking Number</p>
+                    <p class="text-gray-900 font-semibold">{{ $order->tracking_number ?? 'N/A' }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 font-medium">Payment Method</p>
+                    <p class="text-gray-900 font-semibold uppercase">{{ $order->payment_method ?? 'COD' }}</p>
+                </div>
+            </div>
+
+            <!-- Ordered Items -->
+            <div>
+                <h3 class="text-base font-semibold text-gray-900 mb-3">Items Ordered</h3>
+                <div class="divide-y divide-gray-100 border-t border-b border-gray-100">
+                    @foreach($order->order_items ?? [] as $item)
+                        <div class="py-3 flex justify-between items-center text-sm gap-4">
+                            <div class="flex items-center gap-3">
+                                @if(isset($item->product->image))
+                                    <img src="{{ asset('storage/' . $item->product->image) }}" alt="{{ $item->product->name ?? 'Product' }}" class="w-12 h-12 object-cover rounded-lg border">
+                                @endif
+                                <div>
+                                    <span class="font-medium text-gray-900 block">{{ $item->product->name ?? 'Product Name Unavailable' }}</span>
+                                    <span class="text-xs text-gray-500">Qty: {{ $item->qty }}</span>
+                                </div>
+                            </div>
+                            <span class="font-semibold text-gray-900">${{ number_format($item->amount, 2) }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- Total Amount -->
+            <div class="flex justify-between items-center pt-2 font-bold text-base text-gray-900">
+                <span>Total Amount</span>
+                <span class="text-lg">${{ number_format($order->total_amount ?? $order->grand_total ?? 0, 2) }}</span>
+            </div>
         </div>
     @endif
 </div>

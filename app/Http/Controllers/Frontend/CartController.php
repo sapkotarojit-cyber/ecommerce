@@ -25,7 +25,7 @@ class CartController extends Controller
         $vendorTotal = [];
 
         foreach ($cartItems as $item) {
-            $price = $item->varient->price;
+            $price = $item->varient->price ?? 0;
             $discount = $item->varient->discount ?? 0;
             $finalPrice = $price - ($price * $discount / 100);
             $itemTotal = $finalPrice * $item->qty;
@@ -61,6 +61,9 @@ class CartController extends Controller
 
         // Check stock
         if ($varient->qty < $request->qty) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Not enough stock available. Only ' . $varient->qty . ' left.'], 422);
+            }
             return back()->with('error', 'Not enough stock available. Only ' . $varient->qty . ' left.');
         }
 
@@ -72,6 +75,9 @@ class CartController extends Controller
         if ($existing) {
             $newQty = $existing->qty + $request->qty;
             if ($varient->qty < $newQty) {
+                if ($request->ajax() || $request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => 'Not enough stock available. You already have ' . $existing->qty . ' in cart.'], 422);
+                }
                 return back()->with('error', 'Not enough stock available. You already have ' . $existing->qty . ' in cart.');
             }
             $existing->qty = $newQty;
@@ -88,8 +94,8 @@ class CartController extends Controller
             $message = 'Item added to cart successfully!';
         }
 
-        // Check if request wants JSON response
-        if ($request->ajax()) {
+        // Return JSON response if requested via Fetch/AJAX
+        if ($request->ajax() || $request->wantsJson()) {
             $cartCount = Cart::where('user_id', Auth::id())->sum('qty');
             return response()->json([
                 'success' => true,
@@ -99,6 +105,49 @@ class CartController extends Controller
         }
 
         return redirect()->route('cart.index')->with('success', $message);
+    }
+
+    /**
+     * Buy now: Add item to cart and redirect straight to checkout.
+     */
+    public function buyNow(Request $request)
+    {
+        $request->validate([
+            'varient_id' => 'required|exists:product_varients,id',
+            'qty' => 'required|integer|min:1',
+        ]);
+
+        $varient = ProductVarient::with('product.dokan')->findOrFail($request->varient_id);
+
+        if ($varient->qty < $request->qty) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Requested quantity is not available in stock.'
+            ], 422);
+        }
+
+        $existing = Cart::where('user_id', Auth::id())
+            ->where('varient_id', $request->varient_id)
+            ->first();
+
+        if ($existing) {
+            $existing->update([
+                'qty' => $existing->qty + $request->qty
+            ]);
+        } else {
+            Cart::create([
+                'user_id' => Auth::id(),
+                'product_id' => $varient->product_id,
+                'varient_id' => $varient->id,
+                'dokan_id' => $varient->product->dokan_id ?? null,
+                'qty' => $request->qty,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'redirect_url' => route('orders.checkout')
+        ]);
     }
 
     /**

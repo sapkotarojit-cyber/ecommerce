@@ -40,4 +40,14 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'esewa' => [
+    'merchant_code' => env('ESEWA_MERCHANT_CODE', 'EPAYTEST'),
+    'secret_key' => env('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q'),
+    'url' => env('ESEWA_URL', 'https://rc-epay.esewa.com.np/api/epay/main/v2/form'),
+    ],
+
+    'bank' => [
+            'url' => env('BANK_URL', '#'),
+        ],
+
 ];

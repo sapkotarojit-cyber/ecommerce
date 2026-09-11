@@ -78,8 +78,13 @@
                         <a href="{{ route('product', $product->id) }}">
                             <div class="relative h-64 bg-gray-100 overflow-hidden">
                                 @if($product->varients->first() && $product->varients->first()->images)
-                                    @php $images = json_decode($product->varients->first()->images, true); @endphp
-                                    @if($images && count($images) > 0)
+                                    @php 
+                                        $images = $product->varients->first()->images; 
+                                        if (is_string($images)) {
+                                            $images = json_decode($images, true);
+                                        }
+                                    @endphp
+                                    @if(is_array($images) && count($images) > 0)
                                         <img src="{{ asset('storage/' . $images[0]) }}" 
                                              alt="{{ $product->title }}" 
                                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">

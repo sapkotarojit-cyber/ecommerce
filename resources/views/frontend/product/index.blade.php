@@ -74,20 +74,39 @@
                                 <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group">
                                     <a href="{{ route('product', $product->id) }}">
                                         <div class="relative h-56 bg-gray-100 overflow-hidden">
-                                            @if($product->varients->first() && $product->varients->first()->images)
-                                                @php $images = json_decode($product->varients->first()->images, true); @endphp
-                                                @if($images && count($images) > 0)
-                                                    <img src="{{ asset('storage/' . $images[0]) }}" 
-                                                         alt="{{ $product->title }}" 
-                                                         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                                                @else
-                                                    <div class="w-full h-full flex items-center justify-center bg-gray-200">
-                                                        <i class="fas fa-image text-4xl text-gray-400"></i>
-                                                    </div>
-                                                @endif
+                                            @php
+                                                $variant = $product->varients->first();
+                                                $imageUrl = null;
+
+                                                if ($variant && !empty($variant->images)) {
+                                                    $rawImages = $variant->images;
+                                                    
+                                                    // Parse images depending on how they are stored (JSON string, array, or direct path)
+                                                    if (is_array($rawImages)) {
+                                                        $images = $rawImages;
+                                                    } elseif (is_string($rawImages)) {
+                                                        $decoded = json_decode($rawImages, true);
+                                                        $images = is_array($decoded) ? $decoded : [$rawImages];
+                                                    } else {
+                                                        $images = [];
+                                                    }
+
+                                                    if (!empty($images[0])) {
+                                                        $path = $images[0];
+                                                        // Check if path already has http or storage prefix
+                                                        $imageUrl = filter_var($path, FILTER_VALIDATE_URL) ? $path : asset('storage/' . ltrim($path, '/'));
+                                                    }
+                                                }
+                                            @endphp
+
+                                            @if($imageUrl)
+                                                <img src="{{ $imageUrl }}" 
+                                                     alt="{{ $product->title }}" 
+                                                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
                                             @else
-                                                <div class="w-full h-full flex items-center justify-center bg-gray-200">
-                                                    <i class="fas fa-image text-4xl text-gray-400"></i>
+                                                <div class="w-full h-full flex flex-col items-center justify-center bg-gray-100 text-gray-400">
+                                                    <i class="fas fa-image text-4xl mb-1"></i>
+                                                    <span class="text-xs">No Image Available</span>
                                                 </div>
                                             @endif
                                         </div>
@@ -95,7 +114,7 @@
                                     <div class="p-4">
                                         <div class="flex items-center justify-between mb-2">
                                             <span class="text-xs text-[#c9a84c] font-semibold bg-[#c9a84c]/10 px-2 py-1 rounded-full">
-                                                <i class="fas fa-store mr-1"></i> {{ $product->dokan->company_name ?? 'Vendor' }}
+                                                <i class="fas fa-store mr-1"></i> {{ $product->dokan->company_name ?? $product->dokan->name ?? 'Vendor' }}
                                             </span>
                                         </div>
                                         <a href="{{ route('product', $product->id) }}">
@@ -105,14 +124,19 @@
                                         </a>
                                         <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                                             <div>
-                                                @if($product->varients->first())
-                                                    @php $varient = $product->varients->first(); @endphp
-                                                    @if($varient->discount > 0)
-                                                        <span class="text-sm text-gray-400 line-through">Rs. {{ number_format($varient->price, 2) }}</span>
-                                                        <span class="text-lg font-bold text-[#1a2a6c] ml-1">Rs. {{ number_format($varient->price - ($varient->price * $varient->discount / 100), 2) }}</span>
+                                                @if($variant)
+                                                    @php 
+                                                        $price = $variant->price ?? 0;
+                                                        $discount = $variant->discount ?? 0;
+                                                    @endphp
+                                                    @if($discount > 0)
+                                                        <span class="text-sm text-gray-400 line-through">Rs. {{ number_format($price, 2) }}</span>
+                                                        <span class="text-lg font-bold text-[#1a2a6c] ml-1">Rs. {{ number_format($price - ($price * $discount / 100), 2) }}</span>
                                                     @else
-                                                        <span class="text-lg font-bold text-[#1a2a6c]">Rs. {{ number_format($varient->price, 2) }}</span>
+                                                        <span class="text-lg font-bold text-[#1a2a6c]">Rs. {{ number_format($price, 2) }}</span>
                                                     @endif
+                                                @else
+                                                    <span class="text-sm text-gray-400">Price unavailable</span>
                                                 @endif
                                             </div>
                                             <a href="{{ route('product', $product->id) }}" class="text-[#c9a84c] hover:text-[#b8963a]">

@@ -13,20 +13,17 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
-use Override;
+use UnitEnum;
 
 class DokanResource extends Resource
 {
     protected static ?string $model = Dokan::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
 
-    protected static ?string $recordTitleAttribute = 'company_name';
+    protected static UnitEnum|string|null $navigationGroup = 'Vendors & Logistics';
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
+    protected static ?int $navigationSort = 1;
 
     public static function form(Schema $schema): Schema
     {
@@ -40,9 +37,7 @@ class DokanResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

@@ -13,6 +13,7 @@
         "vite": "^7.3.5"
     },
     "dependencies": {
+        "alpinejs": "^3.17.2",
         "flowbite": "^4.0.2"
     }
 }
