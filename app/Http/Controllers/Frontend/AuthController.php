@@ -77,7 +77,7 @@ class AuthController extends Controller
     public function redirect()
     {
         try {
-            return Socialite::driver('google')->redirect();
+            return Socialite::driver('google')->stateless()->redirect();
         } catch (\Exception $e) {
             Log::error('Google redirect error: ' . $e->getMessage());
             return redirect()->route('login')->with('error', 'Unable to connect to Google. Please try again.');
@@ -90,8 +90,7 @@ class AuthController extends Controller
     public function callback()
     {
         try {
-            $googleUser = Socialite::driver('google')->user();
-
+            $googleUser = Socialite::driver('google')->stateless()->user();
             if (!$googleUser || !$googleUser->getEmail()) {
                 return redirect()->route('login')->with('error', 'Invalid response from Google.');
             }

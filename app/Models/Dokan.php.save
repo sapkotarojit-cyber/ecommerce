@@ -6,10 +6,8 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Filament\Models\Contracts\HasName;
 
-class Dokan extends Authenticatable implements HasName
-
+class Dokan extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
@@ -18,11 +16,6 @@ class Dokan extends Authenticatable implements HasName
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
-
-    public function getFilamentName(): string
-{
-    return $this->company_name ?: $this->email;
-}
 
     /**
      * The attributes that are mass assignable.
@@ -39,7 +32,6 @@ class Dokan extends Authenticatable implements HasName
         'contact_number',
         'logo',
         'status',
-        'rejection_comment',
     ];
 
     /**
@@ -77,3 +69,6 @@ class Dokan extends Authenticatable implements HasName
         return $this->hasMany(Order::class);
     }
 }
+q
+x
+

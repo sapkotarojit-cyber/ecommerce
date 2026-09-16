@@ -37,6 +37,11 @@ Route::post('/track-order', [OrderController::class, 'trackResult'])->name('orde
 // Public Cart View
 Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
 
+// google auth routes
+Route::get('/auth/redirect', [AuthController::class, 'redirect'])->name('redirect');
+Route::get('/auth/callback', [AuthController::class, 'callback'])->name('auth.callback');
+Route::get('/auth/google/callback', [AuthController::class, 'callback'])->name('google.callback');
+
 // ============================================
 // GUEST ROUTES (Unauthenticated)
 // ============================================
@@ -48,10 +53,6 @@ Route::middleware('unauth')->group(function () {
     // Registration Routes
     Route::get('/register', [AuthController::class, 'register'])->name('register');
     Route::post('/register', [AuthController::class, 'registerSubmit'])->name('register.submit');
-
-    // Socialite Routes
-    Route::get('/auth/redirect', [AuthController::class, 'redirect'])->name('redirect');
-    Route::get('/auth/callback', [AuthController::class, 'callback'])->name('auth.callback');
 });
 
 // ============================================
@@ -59,6 +60,13 @@ Route::middleware('unauth')->group(function () {
 // ============================================
 Route::middleware('auth')->group(function () {
     Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+
+    // Profile & Settings Routes
+    Route::get('/profile', [App\Http\Controllers\Frontend\ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [App\Http\Controllers\Frontend\ProfileController::class, 'update'])->name('profile.update');
+    
+    Route::get('/settings', [App\Http\Controllers\Frontend\ProfileController::class, 'settings'])->name('settings');
+    Route::put('/settings/password', [App\Http\Controllers\Frontend\ProfileController::class, 'updatePassword'])->name('settings.password');
 
     // Shipping Address Routes
     Route::prefix('shipping-address')->name('shipping-address.')->group(function () {
@@ -91,8 +99,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');
     });
 
-    // Inside Route::middleware('auth')->group(...) -> Order Routes section:
-Route::get('/bank-transfer/pay', [OrderController::class, 'bankPaymentPage'])->name('bank.pay');
+    Route::get('/bank-transfer/pay', [OrderController::class, 'bankPaymentPage'])->name('bank.pay');
 });
 
 // ============================================
@@ -106,6 +113,5 @@ Route::prefix('payment/esewa')->name('esewa.')->group(function () {
 Route::match(['get', 'post'], '/payment/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
 Route::match(['get', 'post'], '/payment/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');
 
-// Bank Payment Routes (Make sure Route:: prefix is included here)
 Route::get('/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success');
 Route::get('/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
+use App\Mail\DokanApplicationReceived;
 use App\Mail\DokanRequestNotification;
 use App\Models\Dokan;
 use App\Models\Product;
@@ -16,18 +17,19 @@ class PageController extends Controller
     public function home()
     {
         $products = Product::latest()->get();
+
         return view('frontend.home', compact('products'));
     }
 
     public function support()
-{
-    return view('frontend.support');
-}
+    {
+        return view('frontend.support');
+    }
 
-public function about()
-{
-    return view('frontend.about');
-}
+    public function about()
+    {
+        return view('frontend.about');
+    }
 
     public function products(Request $request)
     {
@@ -38,12 +40,14 @@ public function about()
             $query->where('category', $request->input('category'));
         }
 
-        // Filter by Price Range (checks against variant prices)
+        // Filter by Price Range
         if ($request->filled('min_price') || $request->filled('max_price')) {
             $query->whereHas('varients', function ($q) use ($request) {
+
                 if ($request->filled('min_price')) {
                     $q->where('price', '>=', $request->input('min_price'));
                 }
+
                 if ($request->filled('max_price')) {
                     $q->where('price', '<=', $request->input('max_price'));
                 }
@@ -52,25 +56,45 @@ public function about()
 
         // Apply Sorting
         switch ($request->input('sort')) {
+
             case 'price_asc':
+
                 $query->whereHas('varients')
-                    ->join('product_varients', 'products.id', '=', 'product_varients.product_id')
+                    ->join(
+                        'product_varients',
+                        'products.id',
+                        '=',
+                        'product_varients.product_id'
+                    )
                     ->orderBy('product_varients.price', 'asc')
                     ->select('products.*');
+
                 break;
+
             case 'price_desc':
+
                 $query->whereHas('varients')
-                    ->join('product_varients', 'products.id', '=', 'product_varients.product_id')
+                    ->join(
+                        'product_varients',
+                        'products.id',
+                        '=',
+                        'product_varients.product_id'
+                    )
                     ->orderBy('product_varients.price', 'desc')
                     ->select('products.*');
+
                 break;
+
             case 'newest':
+
             default:
+
                 $query->latest('products.created_at');
+
                 break;
         }
 
-        // Paginate results and append URL parameters
+        // Paginate results
         $products = $query->paginate(12)->withQueryString();
 
         return view('frontend.product.index', compact('products'));
@@ -78,11 +102,13 @@ public function about()
 
     public function product($id)
     {
-        $product = Product::with(['dokan', 'varients'])->findOrFail($id);
+        $product = Product::with([
+            'dokan',
+            'varients'
+        ])->findOrFail($id);
+
         return view('frontend.product.show', compact('product'));
     }
-
-
 
     public function dokan_registration()
     {
@@ -91,6 +117,7 @@ public function about()
 
     public function dokan_registration_submit(Request $request)
     {
+        // Validate registration form
         $validated = $request->validate([
             'company_name' => 'required|string|max:255',
             'email' => 'required|email|unique:dokans,email',
@@ -101,42 +128,77 @@ public function about()
         ]);
 
         try {
-            // Handle logo upload
+
+            /*
+            |--------------------------------------------------------------------------
+            | Handle Logo Upload
+            |--------------------------------------------------------------------------
+            */
+
             $file = $request->file('logo');
+
             $logoPath = null;
+
             if ($file) {
-                $fileName = time() . '_' . preg_replace('/[^a-zA-Z0-9.]/', '', $file->getClientOriginalName());
-                $file->move(public_path('storage/vendor-logos'), $fileName);
+
+                $fileName = time() . '_' .
+                    preg_replace(
+                        '/[^a-zA-Z0-9.]/',
+                        '',
+                        $file->getClientOriginalName()
+                    );
+
+                $file->move(
+                    public_path('storage/vendor-logos'),
+                    $fileName
+                );
+
                 $logoPath = 'vendor-logos/' . $fileName;
             }
 
-            // Create dokan record
+            /*
+            |--------------------------------------------------------------------------
+            | Create Vendor Application
+            |--------------------------------------------------------------------------
+            */
+
             $dokan = new Dokan();
-            $dokan->user_id = Auth::id(); // ✅ Save user_id
+
+            $dokan->user_id = Auth::id();
             $dokan->company_name = $validated['company_name'];
             $dokan->email = $validated['email'];
             $dokan->reg_no = $validated['reg_no'];
             $dokan->contact_number = $validated['contact_number'];
             $dokan->logo = $logoPath;
             $dokan->status = Dokan::STATUS_PENDING;
-            $dokan->save();
 
-            // Send email notification to admin
-            try {
-                Mail::to(config('mail.from.address'))->send(new DokanRequestNotification($dokan));
-            } catch (\Exception $e) {
-                Log::error('Failed to send vendor registration email: ' . $e->getMessage());
-            }
+           $dokan->save();
 
-            return redirect()->route('dokan_registration')
-                ->with('success', 'Your application has been submitted successfully! We will review it within 24-48 hours.');
+/*
+|--------------------------------------------------------------------------
+| Send Application Notification to Admin
+|--------------------------------------------------------------------------
+*/
 
-        } catch (\Exception $e) {
-            Log::error('Vendor registration error: ' . $e->getMessage());
+Mail::to([
+    'empireinnovation2025@gmail.com',
+    $dokan->email,
+])->send(new DokanApplicationReceived($dokan));
+
+return redirect()
+    ->back()
+    ->with('success', 'Vendor registration submitted successfully.');
+        } catch (\Throwable $exception) {
+            Log::error('Vendor registration failed.', [
+                'exception' => $exception,
+            ]);
+
             return redirect()
                 ->back()
                 ->withInput()
-                ->with('error', 'Something went wrong. Please try again.');
+                ->with('error', 'Unable to submit vendor registration.');
         }
     }
 }
+
+           

@@ -1,0 +1,14 @@
+[90m= [39m[34;4mApp\Models\Dokan[39;24m {#9657
+    [34mid[39m: [35m2[39m,
+    [34muser_id[39m: [35m1[39m,
+    [34memail[39m: [32m"[39m[32mbasant123@gmail.com[39m[32m"[39m,
+    #[33mpassword[39m: [36mnull[39m,
+    [34mcompany_name[39m: [32m"[39m[32mbasant[39m[32m"[39m,
+    [34mlogo[39m: [32m"[39m[32mvendor-logos/1789548236_images.jpeg[39m[32m"[39m,
+    [34mreg_no[39m: [32m"[39m[32m2222[39m[32m"[39m,
+    [34mcontact_number[39m: [32m"[39m[32m9800009900[39m[32m"[39m,
+    [34mstatus[39m: [32m"[39m[32mpending[39m[32m"[39m,
+    #[33mremember_token[39m: [36mnull[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-09-16 08:43:56[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-09-16 08:43:56[39m[32m"[39m,
+  }

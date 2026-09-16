@@ -25,10 +25,10 @@ class DokanPanelProvider extends PanelProvider
     {
         return $panel
             ->id('dokan')
-            ->path('dokan')
+            ->path('vendor')
             ->login()
-            ->registration()
-            // ->authGuard('dokan')
+            // ->registration()
+            ->authGuard('dokan')
             ->colors([
                 'primary' => Color::Amber,
             ])

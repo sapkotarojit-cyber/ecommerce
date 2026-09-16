@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Dokans\Schemas;
 
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 
 class DokanForm
@@ -14,24 +16,43 @@ class DokanForm
             ->components([
                 TextInput::make('user_id')
                     ->numeric(),
+
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()
                     ->required(),
+
                 TextInput::make('password')
                     ->password(),
+
                 TextInput::make('company_name')
                     ->required(),
+
                 TextInput::make('logo')
                     ->required(),
+
                 TextInput::make('reg_no')
                     ->required(),
+
                 TextInput::make('contact_number')
                     ->required(),
+
                 Select::make('status')
-                    ->options(['pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected'])
+                    ->options([
+                        'pending' => 'Pending',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                    ])
                     ->default('pending')
-                    ->required(),
+                    ->required()
+                    ->live(),
+
+                Textarea::make('rejection_comment')
+                    ->label('Rejection Comment')
+                    ->placeholder('Enter the reason for rejecting this vendor application...')
+                    ->rows(4)
+                    ->visible(fn (Get $get): bool => $get('status') === 'rejected')
+                    ->required(fn (Get $get): bool => $get('status') === 'rejected'),
             ]);
     }
 }

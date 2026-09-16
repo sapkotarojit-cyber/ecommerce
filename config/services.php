@@ -51,3 +51,11 @@ return [
         ],
 
 ];
+
+// FACEBOOK_CLIENT_ID=945860118562238
+// FACEBOOK_CLIENT_SECRET=6d290b0180cf236ce35e592a81af219f
+// FACEBOOK_REDIRECT_URI="http://localhost:8000/auth/facebook/callback"
+
+// GOOGLE_CLIENT_ID=116565645897-s13guq26f95f8t8asicecdkhemo60hvk.apps.googleusercontent.com
+// GOOGLE_CLIENT_SECRET=OCSPX-GBTmw1mYSG20RvYG1e1OG0gkh1Uu
+// GOOGLE_REDIRECT_URI="http://localhost:8000/auth/google/callback"
