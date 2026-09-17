@@ -94,6 +94,7 @@
                         </div>
 
                         <div class="space-y-4 mb-6">
+                            @php $itemIndex = 0; @endphp
                             @foreach($vendorTotal as $dokanId => $vendorGroup)
                                 <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                                     <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
@@ -105,14 +106,22 @@
                                                 $price = $item->varient->price ?? $item->product->price ?? 0;
                                                 $discount = $item->varient->discount ?? 0;
                                                 $finalPrice = $price - ($price * $discount / 100);
+                                                $quantity = $item->qty ?? $item->quantity ?? 1;
+                                                $varientId = $item->varient_id ?? $item->varient->id ?? null;
                                             @endphp
+
+                                            <!-- Hidden Inputs Passed to Request -->
+                                            <input type="hidden" name="items[{{ $itemIndex }}][varient_id]" value="{{ $varientId }}">
+                                            <input type="hidden" name="items[{{ $itemIndex }}][quantity]" value="{{ $quantity }}">
+
                                             <div class="flex justify-between items-start text-sm">
                                                 <div>
                                                     <span class="font-medium text-gray-900 block">{{ $item->product->name ?? 'Product' }}</span>
-                                                    <span class="text-xs text-gray-500">Qty: {{ $item->qty }} × ${{ number_format($finalPrice, 2) }}</span>
+                                                    <span class="text-xs text-gray-500">Qty: {{ $quantity }} × ${{ number_format($finalPrice, 2) }}</span>
                                                 </div>
-                                                <span class="font-semibold text-gray-900">${{ number_format($finalPrice * $item->qty, 2) }}</span>
+                                                <span class="font-semibold text-gray-900">${{ number_format($finalPrice * $quantity, 2) }}</span>
                                             </div>
+                                            @php $itemIndex++; @endphp
                                         @endforeach
                                     </div>
                                     <div class="flex justify-between text-xs text-gray-500 font-medium">

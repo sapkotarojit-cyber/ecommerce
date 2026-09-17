@@ -6,28 +6,16 @@ use App\Http\Controllers\Frontend\PageController;
 use App\Http\Controllers\Frontend\ShippingAddressController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\OrderController;
-use App\Http\Controllers\Vendor\AuthController as VendorAuthController;
-use App\Http\Controllers\Vendor\DashboardController;
-use App\Http\Controllers\Vendor\ProductController;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
 
-// ============================================
+
 // Public Routes
-// ============================================
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/about', [PageController::class, 'about'])->name('about');
 Route::get('dokan-registration', [PageController::class, 'dokan_registration'])->name('dokan_registration');
 Route::post('dokan-registration', [PageController::class, 'dokan_registration_submit'])->name('dokan_registration_submit');
 Route::get('/products', [PageController::class, 'products'])->name('products');
-
-// Single route definition mapped to 'product' (used by Blade views)
 Route::get('/product/{id}', [PageController::class, 'product'])->name('product');
-
 Route::get('/support', [PageController::class, 'support'])->name('support');
 
 // Public Track Order Routes
@@ -37,23 +25,38 @@ Route::post('/track-order', [OrderController::class, 'trackResult'])->name('orde
 // Public Cart View
 Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
 
-// google auth routes
+// OAuth routes
 Route::get('/auth/redirect', [AuthController::class, 'redirect'])->name('redirect');
 Route::get('/auth/callback', [AuthController::class, 'callback'])->name('auth.callback');
 Route::get('/auth/google/callback', [AuthController::class, 'callback'])->name('google.callback');
+Route::get('/auth/auth0/redirect', [AuthController::class, 'auth0Redirect'])->name('auth0.redirect');
+Route::get('/auth/auth0/callback', [AuthController::class, 'auth0Callback'])->name('auth0.callback');
 
 // ============================================
-// GUEST ROUTES (Unauthenticated)
+// GUEST ROUTES (Unauthenticated with Rate Limiting)
 // ============================================
 Route::middleware('unauth')->group(function () {
-    // Login Routes
     Route::get('/login', [AuthController::class, 'login'])->name('login');
-    Route::post('/login', [AuthController::class, 'loginSubmit'])->name('login.submit');
+    Route::post('/login', [AuthController::class, 'loginSubmit'])
+        ->middleware('throttle:5,1')
+        ->name('login.submit');
 
-    // Registration Routes
     Route::get('/register', [AuthController::class, 'register'])->name('register');
-    Route::post('/register', [AuthController::class, 'registerSubmit'])->name('register.submit');
+    Route::post('/register', [AuthController::class, 'registerSubmit'])
+        ->middleware('throttle:3,1')
+        ->name('register.submit');
 });
+
+// ============================================
+// VERIFICATION ROUTES (Exempt from UnAuthMiddleware)
+// ============================================
+Route::get('/verify-email', [AuthController::class, 'showVerifyForm'])->name('verify.show');
+Route::post('/verify-email', [AuthController::class, 'verifyCode'])
+    ->middleware('throttle:5,1')
+    ->name('verify.submit');
+Route::post('/resend-verification-code', [AuthController::class, 'resendCode'])
+    ->middleware('throttle:3,1')
+    ->name('verify.resend');
 
 // ============================================
 // AUTHENTICATED ROUTES
@@ -61,7 +64,6 @@ Route::middleware('unauth')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    // Profile & Settings Routes
     Route::get('/profile', [App\Http\Controllers\Frontend\ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [App\Http\Controllers\Frontend\ProfileController::class, 'update'])->name('profile.update');
     
@@ -79,7 +81,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{address}/set-default', [ShippingAddressController::class, 'setDefault'])->name('set-default');
     });
 
-   // Authenticated Cart Actions
+    // Authenticated Cart Actions
     Route::prefix('cart')->name('cart.')->group(function () {
         Route::post('/add', [CartController::class, 'add'])->name('add');
         Route::post('/buy-now', [CartController::class, 'buyNow'])->name('buy-now');
@@ -103,7 +105,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // ============================================
-// PAYMENT GATEWAY CALLBACK ROUTES (CSRF Exempt)
+// PAYMENT GATEWAY CALLBACK ROUTES
 // ============================================
 Route::prefix('payment/esewa')->name('esewa.')->group(function () {
     Route::match(['get', 'post'], '/success', [OrderController::class, 'esewaSuccess'])->name('success')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
@@ -113,5 +115,6 @@ Route::prefix('payment/esewa')->name('esewa.')->group(function () {
 Route::match(['get', 'post'], '/payment/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
 Route::match(['get', 'post'], '/payment/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');
 
-Route::get('/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success');
-Route::get('/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');
+// routes/web.php
+
+// Vendor Login Route

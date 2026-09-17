@@ -1,4 +1,3 @@
-<!-- resources/views/frontend/home.blade.php -->
 @extends('frontend.frontend-layout')
 
 @section('title', 'Empireinnovation - Multi-Vendor Marketplace')
@@ -124,7 +123,7 @@
                                     {{ $product->title }}
                                 </h3>
                             </a>
-                            <p class="text-gray-500 text-sm mt-1 line-clamp-2">{{ Str::limit($product->description, 80) }}</p>
+                            <p class="text-gray-500 text-sm mt-1 line-clamp-2">{{ Str::limit(strip_tags($product->description), 80) }}</p>
                             <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
                                 <div>
                                     @if($product->varients->first())
