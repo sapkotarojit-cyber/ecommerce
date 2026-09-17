@@ -52,6 +52,30 @@ class ShippingAddressController extends Controller
             ->with('success', 'Shipping address added successfully!');
     }
 
+    public function quickStore(Request $request)
+    {
+        $validated = $request->validate([
+            'title'        => 'required|string|max:255',
+            'contact_no'   => 'required|string|max:20',
+            'full_address' => 'required|string|max:500',
+        ]);
+
+        $hasAddresses = ShippingAddress::where('user_id', Auth::id())->exists();
+
+        $address = ShippingAddress::create([
+            'user_id'      => Auth::id(),
+            'title'        => $validated['title'],
+            'contact_no'   => $validated['contact_no'],
+            'full_address' => $validated['full_address'],
+            'is_default'   => !$hasAddresses,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'address' => $address,
+        ]);
+    }
+
     public function edit(ShippingAddress $addresses)
     {
         if ($addresses->user_id !== Auth::id()) {

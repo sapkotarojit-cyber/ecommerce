@@ -8,6 +8,7 @@
                     <span>Free Shipping on Medical & Surgical Orders $50+</span>
                 </div>
                 <div class="hidden md:flex space-x-6">
+                    <a href="{{ route('orders.index') }}" class="hover:text-[#c9a84c] transition-colors">Orders</a>
                     <a href="{{ route('dokan_registration') }}" class="hover:text-[#c9a84c] transition-colors">Sell on Empire Innovation</a>
                     <a href="{{ route('orders.track') }}" class="hover:text-[#c9a84c] transition-colors">Track Order</a>                    
                     <a href="{{ route('support') }}" class="hover:text-[#c9a84c] transition-colors">Support</a>

@@ -57,7 +57,7 @@
     </div>
 </section>
 
-<!-- Featured Products -->
+<!-- Featured Products Section -->
 <section class="py-12 md:py-16">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between items-center mb-8">
@@ -73,71 +73,82 @@
         @if(isset($products) && $products->count() > 0)
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach($products as $product)
-                    <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group">
-                        <a href="{{ route('product', $product->id) }}">
-                            <div class="relative h-64 bg-gray-100 overflow-hidden">
-                                @if($product->varients->first() && $product->varients->first()->images)
-                                    @php 
-                                        $images = $product->varients->first()->images; 
-                                        if (is_string($images)) {
-                                            $images = json_decode($images, true);
+                    <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group flex flex-col justify-between">
+                        <div>
+                            <a href="{{ route('product', $product->id) }}">
+                                <div class="relative h-64 bg-gray-100 overflow-hidden">
+                                    @php
+                                        $firstVariant = $product->varients->first();
+                                        $imageUrl = null;
+
+                                        if ($firstVariant && !empty($firstVariant->images)) {
+                                            $rawImages = $firstVariant->images;
+                                            
+                                            if (is_array($rawImages)) {
+                                                $images = $rawImages;
+                                            } elseif (is_string($rawImages)) {
+                                                $decoded = json_decode($rawImages, true);
+                                                $images = is_array($decoded) ? $decoded : [$rawImages];
+                                            } else {
+                                                $images = [];
+                                            }
+
+                                            if (!empty($images[0])) {
+                                                $path = trim(str_replace(['\\', '"', '[', ']'], '', $images[0]));
+                                                $imageUrl = filter_var($path, FILTER_VALIDATE_URL) ? $path : asset('storage/' . ltrim($path, '/'));
+                                            }
                                         }
                                     @endphp
-                                    @if(is_array($images) && count($images) > 0)
-                                        <img src="{{ asset('storage/' . $images[0]) }}" 
+
+                                    @if($imageUrl)
+                                        <img src="{{ $imageUrl }}" 
                                              alt="{{ $product->title }}" 
                                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
                                     @else
-                                        <div class="w-full h-full flex items-center justify-center bg-gray-200">
-                                            <i class="fas fa-image text-4xl text-gray-400"></i>
+                                        <div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">
+                                            <i class="fas fa-image text-4xl"></i>
                                         </div>
                                     @endif
-                                @else
-                                    <div class="w-full h-full flex items-center justify-center bg-gray-200">
-                                        <i class="fas fa-image text-4xl text-gray-400"></i>
-                                    </div>
-                                @endif
-                                @if($product->varients->first() && $product->varients->first()->discount > 0)
-                                    <span class="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                                        -{{ $product->varients->first()->discount }}%
-                                    </span>
-                                @endif
-                            </div>
-                        </a>
-                        <div class="p-5">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs text-[#c9a84c] font-semibold bg-[#c9a84c]/10 px-3 py-1 rounded-full">
-                                    <i class="fas fa-store mr-1"></i> {{ $product->dokan->company_name ?? 'Vendor' }}
-                                </span>
-                                <div class="flex items-center text-yellow-400 text-sm">
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star"></i>
-                                    <i class="fas fa-star-half-alt"></i>
-                                    <span class="text-gray-400 ml-1">(24)</span>
                                 </div>
-                            </div>
-                            <a href="{{ route('product', $product->id) }}">
-                                <h3 class="text-lg font-semibold text-[#1a2a6c] hover:text-[#c9a84c] transition-colors line-clamp-1">
-                                    {{ $product->title }}
-                                </h3>
                             </a>
-                            <p class="text-gray-500 text-sm mt-1 line-clamp-2">{{ Str::limit(strip_tags($product->description), 80) }}</p>
-                            <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                            
+                            <div class="p-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-xs text-[#c9a84c] font-semibold bg-[#c9a84c]/10 px-2 py-1 rounded-full">
+                                        <i class="fas fa-store mr-1"></i> {{ $product->dokan->company_name ?? $product->dokan->name ?? 'Vendor' }}
+                                    </span>
+                                </div>
+
+                                <a href="{{ route('product', $product->id) }}">
+                                    <h3 class="font-semibold text-[#1a2a6c] hover:text-[#c9a84c] transition-colors line-clamp-1">
+                                        {{ $product->title }}
+                                    </h3>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Pricing & Detail Link Footer -->
+                        <div class="p-4 pt-0">
+                            <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                                 <div>
                                     @if($product->varients->first())
-                                        @php $varient = $product->varients->first(); @endphp
-                                        @if($varient->discount > 0)
-                                            <span class="text-sm text-gray-400 line-through">Rs. {{ number_format($varient->price, 2) }}</span>
-                                            <span class="text-xl font-bold text-[#1a2a6c] ml-2">Rs. {{ number_format($varient->price - ($varient->price * $varient->discount / 100), 2) }}</span>
+                                        @php 
+                                            $variant = $product->varients->first();
+                                            $price = $variant->price ?? 0;
+                                            $discount = $variant->discount ?? 0;
+                                        @endphp
+                                        @if($discount > 0)
+                                            <span class="text-sm text-gray-400 line-through">Rs. {{ number_format($price, 2) }}</span>
+                                            <span class="text-lg font-bold text-[#1a2a6c] ml-1">Rs. {{ number_format($price - ($price * $discount / 100), 2) }}</span>
                                         @else
-                                            <span class="text-xl font-bold text-[#1a2a6c]">Rs. {{ number_format($varient->price, 2) }}</span>
+                                            <span class="text-lg font-bold text-[#1a2a6c]">Rs. {{ number_format($price, 2) }}</span>
                                         @endif
+                                    @else
+                                        <span class="text-sm text-gray-400">Price unavailable</span>
                                     @endif
                                 </div>
-                                <a href="{{ route('product', $product->id) }}" class="inline-flex items-center px-4 py-2 bg-[#c9a84c] text-[#1a2a6c] font-semibold rounded-full hover:bg-[#dbb95c] transition-all text-sm">
-                                    <i class="fas fa-eye mr-1"></i> View
+                                <a href="{{ route('product', $product->id) }}" class="text-[#c9a84c] hover:text-[#b8963a]">
+                                    <i class="fas fa-arrow-right"></i>
                                 </a>
                             </div>
                         </div>
@@ -145,44 +156,11 @@
                 @endforeach
             </div>
         @else
-            <div class="text-center py-12 bg-white rounded-xl shadow-sm">
+            <div class="text-center py-16 bg-white rounded-xl shadow-sm">
                 <i class="fas fa-box-open text-5xl text-gray-300 mb-4"></i>
-                <p class="text-gray-500">No products available yet.</p>
+                <p class="text-gray-500">No featured products available at the moment.</p>
             </div>
         @endif
-    </div>
-</section>
-
-<!-- Why Choose Us -->
-<section class="py-12 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-12">
-            <h2 class="text-2xl md:text-3xl font-bold text-[#1a2a6c]">Why Shop with Empireinnovation?</h2>
-            <p class="text-gray-500 mt-2">Experience the best multi-vendor shopping experience</p>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div class="text-center">
-                <div class="w-16 h-16 bg-[#c9a84c]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-shield-alt text-2xl text-[#c9a84c]"></i>
-                </div>
-                <h3 class="font-semibold text-[#1a2a6c] text-lg">Verified Vendors</h3>
-                <p class="text-gray-500 text-sm mt-2">All vendors are verified for quality and authenticity</p>
-            </div>
-            <div class="text-center">
-                <div class="w-16 h-16 bg-[#c9a84c]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-truck-fast text-2xl text-[#c9a84c]"></i>
-                </div>
-                <h3 class="font-semibold text-[#1a2a6c] text-lg">Fast Delivery</h3>
-                <p class="text-gray-500 text-sm mt-2">Quick and reliable shipping across Nepal</p>
-            </div>
-            <div class="text-center">
-                <div class="w-16 h-16 bg-[#c9a84c]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-headset text-2xl text-[#c9a84c]"></i>
-                </div>
-                <h3 class="font-semibold text-[#1a2a6c] text-lg">24/7 Support</h3>
-                <p class="text-gray-500 text-sm mt-2">Dedicated support team always ready to help</p>
-            </div>
-        </div>
     </div>
 </section>
 @endsection

@@ -3,7 +3,7 @@
 @section('title', 'Checkout')
 
 @section('content')
-<div class="py-8 px-4 sm:px-6 lg:px-8">
+<div class="py-8 px-4 sm:px-6 lg:px-8" x-data="checkoutPage()">
     <div class="max-w-7xl mx-auto">
         <div class="mb-6">
             <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Checkout</h1>
@@ -15,7 +15,7 @@
             </div>
         @endif
 
-        <form action="{{ route('orders.store') }}" method="POST">
+        <form action="{{ route('orders.store') }}" method="POST" id="checkout-form">
             @csrf
             <div class="flex flex-col lg:flex-row gap-8 items-start">
                 
@@ -26,32 +26,33 @@
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                         <div class="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
                             <h2 class="text-lg font-semibold text-gray-900">Shipping Address</h2>
-                            <a href="{{ route('shipping-address.create') }}" class="inline-flex items-center text-xs font-semibold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+                            <button type="button" @click="openModal()" class="inline-flex items-center text-xs font-semibold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
                                 + Add New Address
-                            </a>
+                            </button>
                         </div>
 
                         <div>
-                            @if($addresses->isEmpty())
+                            <div id="no-address-msg" class="{{ $addresses->isNotEmpty() ? 'hidden' : '' }}">
                                 <p class="text-sm text-gray-500 py-2">No shipping addresses found. Please add an address to proceed.</p>
-                            @else
-                                <div class="space-y-3">
-                                    @foreach($addresses as $address)
-                                        <label class="relative flex items-start p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
-                                            <div class="flex items-center h-5">
-                                                <input type="radio" name="shipping_address_id" value="{{ $address->id }}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" {{ $loop->first ? 'checked' : '' }} required>
-                                            </div>
-                                            <div class="ml-3 text-sm">
-                                                <span class="font-semibold text-gray-900">{{ $address->title }}</span>
-                                                <span class="text-gray-500 font-normal">({{ $address->contact_no }})</span>
-                                                <p class="text-gray-600 mt-0.5">
-                                                    {{ $address->full_address }}
-                                                </p>
-                                            </div>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            @endif
+                            </div>
+
+                            <div id="address-list-container" class="space-y-3 {{ $addresses->isEmpty() ? 'hidden' : '' }}">
+                                @foreach($addresses as $address)
+                                    <label class="relative flex items-start p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
+                                        <div class="flex items-center h-5">
+                                            <input type="radio" name="shipping_address_id" value="{{ $address->id }}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" {{ $loop->first ? 'checked' : '' }} required>
+                                        </div>
+                                        <div class="ml-3 text-sm">
+                                            <span class="font-semibold text-gray-900">{{ $address->title }}</span>
+                                            <span class="text-gray-500 font-normal">({{ $address->contact_no }})</span>
+                                            <p class="text-gray-600 mt-0.5">
+                                                {{ $address->full_address }}
+                                            </p>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+
                             @error('shipping_address_id')
                                 <p class="text-red-500 text-xs font-medium mt-2">{{ $message }}</p>
                             @enderror
@@ -95,7 +96,7 @@
 
                         <div class="space-y-4 mb-6">
                             @php $itemIndex = 0; @endphp
-                            @foreach($vendorTotal as $dokanId => $vendorGroup)
+                            @foreach($vendorTotal as $dokanId =>$vendorGroup)
                                 <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
                                     <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
                                         Store: {{ $vendorGroup['dokan']->name ?? 'Default Store' }}
@@ -103,20 +104,20 @@
                                     <div class="space-y-2 mb-3">
                                         @foreach($vendorGroup['items'] as $item)
                                             @php
-                                                $price = $item->varient->price ?? $item->product->price ?? 0;
-                                                $discount = $item->varient->discount ?? 0;
-                                                $finalPrice = $price - ($price * $discount / 100);
-                                                $quantity = $item->qty ?? $item->quantity ?? 1;
-                                                $varientId = $item->varient_id ?? $item->varient->id ?? null;
+                                                $varient =$item->varient ?? null;
+                                                $product =$item->product ?? null;
+                                                $price = $varient->price ?? $product->price ?? 0;
+                                                $discount =$varient->discount ?? 0;
+                                                $finalPrice = $price - ($price * $discount / 100);$quantity = $item->qty ?? $item->quantity ?? 1;
+                                                $varientId =$item->varient_id ?? ($varient ? $varient->id : null);
                                             @endphp
 
-                                            <!-- Hidden Inputs Passed to Request -->
                                             <input type="hidden" name="items[{{ $itemIndex }}][varient_id]" value="{{ $varientId }}">
                                             <input type="hidden" name="items[{{ $itemIndex }}][quantity]" value="{{ $quantity }}">
 
                                             <div class="flex justify-between items-start text-sm">
                                                 <div>
-                                                    <span class="font-medium text-gray-900 block">{{ $item->product->name ?? 'Product' }}</span>
+                                                    <span class="font-medium text-gray-900 block">{{ $product->name ?? 'Product' }}</span>
                                                     <span class="text-xs text-gray-500">Qty: {{ $quantity }} × ${{ number_format($finalPrice, 2) }}</span>
                                                 </div>
                                                 <span class="font-semibold text-gray-900">${{ number_format($finalPrice * $quantity, 2) }}</span>
@@ -137,7 +138,7 @@
                             <span class="text-xl font-extrabold text-gray-900">${{ number_format($grandTotal, 2) }}</span>
                         </div>
 
-                        <button type="submit" class="w-full py-3.5 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider" {{ $addresses->isEmpty() ? 'disabled' : '' }}>
+                        <button id="submit-order-btn" type="submit" class="w-full py-3.5 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider" {{ $addresses->isEmpty() ? 'disabled' : '' }}>
                             Place Order
                         </button>
                     </div>
@@ -145,6 +146,104 @@
 
             </div>
         </form>
+
+        <!-- Inline Add Address Modal -->
+        <div x-show="showAddressModal" x-cloak class="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative" @click.away="closeModal()">
+                <div class="flex justify-between items-center mb-4 border-b pb-3">
+                    <h3 class="text-lg font-bold text-gray-900">Add Shipping Address</h3>
+                    <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <form @submit.prevent="saveAddress()">
+                    <div class="space-y-4 text-sm">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Address Title</label>
+                            <input type="text" x-model="form.title" required placeholder="e.g. Home, Office" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Contact Number</label>
+                            <input type="text" x-model="form.contact_no" required placeholder="e.g. +977 9800000000" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Full Address</label>
+                            <textarea x-model="form.full_address" required rows="3" placeholder="Enter complete address detail..." class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" @click="closeModal()" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 text-xs font-semibold uppercase tracking-wider">Cancel</button>
+                        <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-xs uppercase tracking-wider">Save Address</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+function checkoutPage() {
+    return {
+        showAddressModal: false,
+        form: {
+            title: '',
+            contact_no: '',
+            full_address: ''
+        },
+        openModal() {
+            this.showAddressModal = true;
+        },
+        closeModal() {
+            this.showAddressModal = false;
+            this.form.title = '';
+            this.form.contact_no = '';
+            this.form.full_address = '';
+        },
+        saveAddress() {
+            fetch("{{ route('shipping-address.quick-store') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRF-TOKEN": "{{ csrf_token() }}",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify(this.form)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const address = data.address;
+                    
+                    const newAddressHtml = `
+                        <label class="relative flex items-start p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
+                            <div class="flex items-center h-5">
+                                <input type="radio" name="shipping_address_id" value="${address.id}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked required>
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <span class="font-semibold text-gray-900">${address.title}</span>
+                                <span class="text-gray-500 font-normal">(${address.contact_no})</span>
+                                <p class="text-gray-600 mt-0.5">${address.full_address}</p>
+                            </div>
+                        </label>
+                    `;
+
+                    const container = document.getElementById('address-list-container');
+                    container.classList.remove('hidden');
+                    container.insertAdjacentHTML('beforeend', newAddressHtml);
+
+                    document.getElementById('no-address-msg').classList.add('hidden');
+                    document.getElementById('submit-order-btn').removeAttribute('disabled');
+
+                    this.closeModal();
+                }
+            })
+            .catch(error => console.error("Error adding address:", error));
+        }
+    };
+}
+</script>
 @endsection

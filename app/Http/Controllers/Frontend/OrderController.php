@@ -21,7 +21,7 @@ class OrderController extends Controller
     {
         $search = $request->input('search');
 
-        $orders = Order::with(['order_items.product', 'shipping_address', 'dokan'])
+        $orders = Order::with(['order_items.product', 'order_items.varient.product', 'shipping_address', 'dokan'])
             ->where('user_id', Auth::id())
             ->when($search, function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
@@ -455,7 +455,7 @@ class OrderController extends Controller
 
     public function show($id)
     {
-        $order = Order::with(['order_items.product', 'order_items.varient', 'shipping_address', 'dokan'])
+        $order = Order::with(['order_items.product', 'order_items.varient.product', 'shipping_address', 'dokan'])
             ->where('user_id', Auth::id())
             ->findOrFail($id);
 
@@ -477,7 +477,7 @@ class OrderController extends Controller
 
     public function invoice($id)
     {
-        $order = Order::with(['order_items.product', 'order_items.varient', 'shipping_address', 'dokan'])
+        $order = Order::with(['order_items.product', 'order_items.varient.product', 'shipping_address', 'dokan'])
             ->where('user_id', Auth::id())
             ->findOrFail($id);
 
@@ -497,7 +497,12 @@ class OrderController extends Controller
 
         $query = $request->input('tracking_number');
 
-        $order = Order::with(['order_items.product', 'shipping_address', 'dokan'])
+        $order = Order::with([
+                'order_items.product', 
+                'order_items.varient.product', 
+                'shipping_address', 
+                'dokan'
+            ])
             ->where('tracking_number', $query)
             ->orWhere('id', $query)
             ->first();

@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{address}', [ShippingAddressController::class, 'update'])->name('update');
         Route::delete('/{address}', [ShippingAddressController::class, 'destroy'])->name('destroy');
         Route::patch('/{address}/set-default', [ShippingAddressController::class, 'setDefault'])->name('set-default');
+        Route::post('/quick-store', [ShippingAddressController::class, 'quickStore'])->name('quick-store');
     });
 
     // Authenticated Cart Actions
