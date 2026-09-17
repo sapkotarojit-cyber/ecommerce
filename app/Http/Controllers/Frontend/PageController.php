@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Frontend;
 use App\Http\Controllers\Controller;
 use App\Mail\DokanApplicationReceived;
 use App\Mail\DokanRequestNotification;
+use App\Models\Category;
 use App\Models\Dokan;
 use App\Models\Product;
 use Illuminate\Http\Request;
@@ -37,7 +38,26 @@ class PageController extends Controller
 
         // Filter by Category
         if ($request->filled('category')) {
-            $query->where('category', $request->input('category'));
+            $catValue = $request->input('category');
+
+            $query->where(function ($q) use ($catValue) {
+                // 1. Direct column match (e.g. if category column stores string name/slug or exact integer ID)
+                $q->where('category', $catValue);
+
+                // 2. Foreign key column match (e.g. if category_id column exists on products)
+                if (is_numeric($catValue)) {
+                    $q->orWhere('category_id', $catValue);
+                }
+
+                // 3. Category relationship match (slug or ID via Category model)
+                if (class_exists('App\Models\Category')) {
+                    $q->orWhereHas('category', function ($catQuery) use ($catValue) {
+                        $catQuery->where('slug', $catValue)
+                            ->orWhere('id', $catValue)
+                            ->orWhere('name', $catValue);
+                    });
+                }
+            });
         }
 
         // Filter by Price Range
@@ -94,10 +114,20 @@ class PageController extends Controller
                 break;
         }
 
+        // Fetch categories dynamically
+        if (class_exists('App\Models\Category')) {
+            $categories = Category::all();
+        } else {
+            $categories = Product::whereNotNull('category')
+                ->where('category', '!=', '')
+                ->distinct()
+                ->pluck('category');
+        }
+
         // Paginate results
         $products = $query->paginate(12)->withQueryString();
 
-        return view('frontend.product.index', compact('products'));
+        return view('frontend.product.index', compact('products', 'categories'));
     }
 
     public function product($id)
@@ -172,22 +202,22 @@ class PageController extends Controller
             $dokan->logo = $logoPath;
             $dokan->status = Dokan::STATUS_PENDING;
 
-           $dokan->save();
+            $dokan->save();
 
-/*
-|--------------------------------------------------------------------------
-| Send Application Notification to Admin
-|--------------------------------------------------------------------------
-*/
+            /*
+            |--------------------------------------------------------------------------
+            | Send Application Notification to Admin
+            |--------------------------------------------------------------------------
+            */
 
-Mail::to([
-    'empireinnovation2025@gmail.com',
-    $dokan->email,
-])->send(new DokanApplicationReceived($dokan));
+            Mail::to([
+                'empireinnovation2025@gmail.com',
+                $dokan->email,
+            ])->send(new DokanApplicationReceived($dokan));
 
-return redirect()
-    ->back()
-    ->with('success', 'Vendor registration submitted successfully.');
+            return redirect()
+                ->back()
+                ->with('success', 'Vendor registration submitted successfully.');
         } catch (\Throwable $exception) {
             Log::error('Vendor registration failed.', [
                 'exception' => $exception,
@@ -200,5 +230,3 @@ return redirect()
         }
     }
 }
-
-           

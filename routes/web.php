@@ -32,6 +32,7 @@ Route::get('/auth/google/callback', [AuthController::class, 'callback'])->name('
 Route::get('/auth/auth0/redirect', [AuthController::class, 'auth0Redirect'])->name('auth0.redirect');
 Route::get('/auth/auth0/callback', [AuthController::class, 'auth0Callback'])->name('auth0.callback');
 
+Route::post('/vendor/check-email', [AuthController::class, 'checkVendorEmail'])->name('vendor.check_email');
 // ============================================
 // GUEST ROUTES (Unauthenticated with Rate Limiting)
 // ============================================

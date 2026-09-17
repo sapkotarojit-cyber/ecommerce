@@ -26,14 +26,22 @@
                         </div>
                         
                         <div class="space-y-4">
-                            <!-- Categories -->
+                            <!-- Categories Filter -->
                             <div>
                                 <label class="text-sm font-semibold text-gray-700 block mb-2">Category</label>
-                                <select name="category" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#c9a84c] focus:border-transparent text-sm">
+                                <select name="category" onchange="document.getElementById('filterForm').submit();" class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#c9a84c] focus:border-transparent text-sm">
                                     <option value="">All Categories</option>
-                                    <option value="Medical Equipment" {{ request('category') == 'Medical Equipment' ? 'selected' : '' }}>Medical Equipment</option>
-                                    <option value="Surgical Supplies" {{ request('category') == 'Surgical Supplies' ? 'selected' : '' }}>Surgical Supplies</option>
-                                    <option value="Hospital Furniture" {{ request('category') == 'Hospital Furniture' ? 'selected' : '' }}>Hospital Furniture</option>
+                                    @if(isset($categories) && count($categories) > 0)
+                                        @foreach($categories as $cat)
+                                            @php
+                                                $catValue = is_object($cat) ? ($cat->id ?? $cat->slug ?? $cat->name) : $cat;
+                                                $catLabel = is_object($cat) ? ($cat->name ?? $cat->title) : $cat;
+                                            @endphp
+                                            <option value="{{ $catValue }}" {{ (string)request('category') === (string)$catValue ? 'selected' : '' }}>
+                                                {{ ucfirst($catLabel) }}
+                                            </option>
+                                        @endforeach
+                                    @endif
                                 </select>
                             </div>
                             
@@ -81,7 +89,6 @@
                                                 if ($variant && !empty($variant->images)) {
                                                     $rawImages = $variant->images;
                                                     
-                                                    // Parse images depending on how they are stored (JSON string, array, or direct path)
                                                     if (is_array($rawImages)) {
                                                         $images = $rawImages;
                                                     } elseif (is_string($rawImages)) {
@@ -93,7 +100,6 @@
 
                                                     if (!empty($images[0])) {
                                                         $path = $images[0];
-                                                        // Check if path already has http or storage prefix
                                                         $imageUrl = filter_var($path, FILTER_VALIDATE_URL) ? $path : asset('storage/' . ltrim($path, '/'));
                                                     }
                                                 }
