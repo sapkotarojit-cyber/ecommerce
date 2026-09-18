@@ -7,8 +7,6 @@ use App\Http\Controllers\Frontend\ShippingAddressController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\OrderController;
 
-
-
 // Public Routes
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/about', [PageController::class, 'about'])->name('about');
@@ -33,8 +31,9 @@ Route::get('/auth/auth0/redirect', [AuthController::class, 'auth0Redirect'])->na
 Route::get('/auth/auth0/callback', [AuthController::class, 'auth0Callback'])->name('auth0.callback');
 
 Route::post('/vendor/check-email', [AuthController::class, 'checkVendorEmail'])->name('vendor.check_email');
+
 // ============================================
-// GUEST ROUTES (Unauthenticated with Rate Limiting)
+// GUEST ROUTES (Unauthenticated)
 // ============================================
 Route::middleware('unauth')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
@@ -47,6 +46,15 @@ Route::middleware('unauth')->group(function () {
         ->middleware('throttle:3,1')
         ->name('register.submit');
 });
+
+    // ============================================
+    // FORGOT & RESET PASSWORD ROUTES
+    // ============================================
+    Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
+    Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
+    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
+    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+
 
 // ============================================
 // VERIFICATION ROUTES (Exempt from UnAuthMiddleware)
@@ -116,7 +124,3 @@ Route::prefix('payment/esewa')->name('esewa.')->group(function () {
 
 Route::match(['get', 'post'], '/payment/bank/success', [OrderController::class, 'bankSuccess'])->name('bank.success')->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
 Route::match(['get', 'post'], '/payment/bank/failure', [OrderController::class, 'bankFailure'])->name('bank.failure');
-
-// routes/web.php
-
-// Vendor Login Route

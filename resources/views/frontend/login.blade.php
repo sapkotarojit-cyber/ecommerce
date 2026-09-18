@@ -70,11 +70,18 @@
                     @enderror
                 </div>
 
+                <!-- Remember Me & Forgot Password -->
                 <div class="flex items-center justify-between text-sm">
                     <label class="flex items-center">
                         <input type="checkbox" name="remember" class="rounded border-gray-300 text-[#c9a84c] focus:ring-[#c9a84c]">
                         <span class="ml-2 text-gray-600">Remember me</span>
                     </label>
+
+                    @if (Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" class="text-[#c9a84c] font-semibold hover:text-[#b8963a] transition-all">
+                            Forgot password?
+                        </a>
+                    @endif
                 </div>
 
                 <button type="submit" class="w-full px-4 py-3 bg-[#1a2a6c] text-white font-semibold rounded-lg hover:bg-[#2a3a7c] transition-all">

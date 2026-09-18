@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Products\Tables;
 
+use App\Models\Product;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -14,11 +16,28 @@ class ProductsTable
     {
         return $table
             ->columns([
+                ImageColumn::make('variant_image')
+                    ->label('Image')
+                    ->state(function (Product $record) {
+                        $firstVariant = $record->varients->first();
+                        
+                        if ($firstVariant && !empty($firstVariant->images)) {
+                            // Returns the first image path from the variant's 'images' array
+                            return is_array($firstVariant->images) 
+                                ? $firstVariant->images[0] 
+                                : $firstVariant->images;
+                        }
+
+                        return null;
+                    })
+                    ->square()
+                    ->defaultImageUrl(url('/images/placeholder.png')),
+
+                TextColumn::make('title')
+                    ->searchable(),
                 TextColumn::make('category_id')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('title')
-                    ->searchable(),
                 TextColumn::make('category')
                     ->searchable(),
                 TextColumn::make('dokan_id')

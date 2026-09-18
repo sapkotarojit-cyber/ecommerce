@@ -2,22 +2,25 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Dokan\Pages\Dashboard;
+use App\Filament\Dokan\Resources\Products\ProductResource;
+use App\Filament\Dokan\Widgets\VendorStatsOverview;
+use App\Models\Dokan;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use App\Filament\Dokan\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets\AccountWidget;
+use Filament\View\PanelsRenderHook; 
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Filament\Dokan\Widgets\VendorStatsOverview;
 
 class DokanPanelProvider extends PanelProvider
 {
@@ -27,10 +30,31 @@ class DokanPanelProvider extends PanelProvider
             ->id('dokan')
             ->path('vendor')
             ->login()
-            // ->registration()
+            ->homeUrl('/')
+            ->brandName(function () {
+                $user = Auth::guard('dokan')->user() 
+                    ?? Auth::guard('web')->user() 
+                    ?? Auth::user();
+
+                if (! $user) {
+                    return 'Vendor Panel';
+                }
+
+                return $user->name 
+                    ?? $user->store_name 
+                    ?? $user->dokan?->name 
+                    ?? $user->dokan?->store_name 
+                    ?? 'Vendor';
+            })
+            ->registration()
             ->authGuard('dokan')
+            ->authPasswordBroker('dokans')
+            ->passwordReset()
             ->colors([
                 'primary' => Color::Amber,
+            ])
+            ->resources([
+                ProductResource::class,
             ])
             ->discoverResources(in: app_path('Filament/Dokan/Resources'), for: 'App\Filament\Dokan\Resources')
             ->discoverPages(in: app_path('Filament/Dokan/Pages'), for: 'App\Filament\Dokan\Pages')
@@ -40,7 +64,6 @@ class DokanPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Dokan/Widgets'), for: 'App\Filament\Dokan\Widgets')
             ->widgets([
                 VendorStatsOverview::class,
-                AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

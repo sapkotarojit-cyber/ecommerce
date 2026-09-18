@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Product extends Model
 {
-    public function category(): BelongsTo
+    public function categories(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id');
     }
@@ -31,5 +31,4 @@ class Product extends Model
     {
         return $this->hasMany(ProductVarient::class);
     }
-
 }

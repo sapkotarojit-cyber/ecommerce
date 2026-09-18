@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Dokan;
 use App\Mail\SendVerificationCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Auth\Events\PasswordReset;
 use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Str;
 use Auth0\Laravel\Auth0;
@@ -22,16 +25,15 @@ class AuthController extends Controller
     }
 
     public function vendorLogin()
-{
-    
-    if (Auth::check()) {
-        Auth::logout();
-        request()->session()->invalidate();
-        request()->session()->regenerateToken();
-    }
+    {
+        if (Auth::check()) {
+            Auth::logout();
+            request()->session()->invalidate();
+            request()->session()->regenerateToken();
+        }
 
-    return view('frontend.login')->with('info', 'Please log in with your vendor credentials.');
-}
+        return view('frontend.login')->with('info', 'Please log in with your vendor credentials.');
+    }
 
     public function loginSubmit(Request $request)
     {
@@ -86,7 +88,7 @@ class AuthController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password),
+            'password' => $request->password, // Managed by 'password' => 'hashed' cast
             'verification_code' => $code,
             'verification_code_expires_at' => now()->addMinutes(10),
         ]);
@@ -173,6 +175,106 @@ class AuthController extends Controller
         return back()->with('success', 'A new verification code has been sent to your email address.');
     }
 
+    // ============================================
+    // FORGOT & RESET PASSWORD METHODS
+    // ============================================
+
+    public function showForgotPasswordForm()
+    {
+        return view('frontend.forgot-password');
+    }
+
+    /**
+     * Send a reset link to the given user or vendor's email.
+     */
+    public function sendResetLink(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        // Check if account belongs to Dokan vendor model
+        if (Dokan::where('email', $request->email)->exists()) {
+            $status = Password::broker('dokans')->sendResetLink(
+                $request->only('email')
+            );
+        } else {
+            $status = Password::broker('users')->sendResetLink(
+                $request->only('email')
+            );
+        }
+
+        return $status === Password::RESET_LINK_SENT
+            ? back()->with('success', __($status))
+            : back()->withErrors(['email' => __($status)]);
+    }
+
+    /**
+     * Display the password reset form with token.
+     */
+    public function showResetPasswordForm(Request $request, $token = null)
+    {
+        if (!$token) {
+            return redirect()->route('password.request')
+                ->with('error', 'Please request a new password reset link.');
+        }
+
+        return view('frontend.reset-password')->with([
+            'token' => $token,
+            'email' => $request->email,
+        ]);
+    }
+
+    /**
+     * Reset password for either Dokan or User models.
+     */
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        // 1. Reset Dokan Vendor password if record exists in Dokans table
+        if (Dokan::where('email', $request->email)->exists()) {
+            $status = Password::broker('dokans')->reset(
+                $request->only('email', 'password', 'password_confirmation', 'token'),
+                function ($dokan, $password) {
+                    $dokan->forceFill([
+                        'password' => $password, // Direct assignment - 'hashed' cast handles hashing
+                        'remember_token' => Str::random(60),
+                    ])->save();
+
+                    event(new PasswordReset($dokan));
+                }
+            );
+
+            return $status === Password::PASSWORD_RESET
+                ? redirect('/vendor/login')->with('success', 'Password reset successfully! Please log in.')
+                : back()->withInput($request->only('email'))->withErrors(['email' => [__($status)]]);
+        }
+
+        // 2. Fallback to default User model reset
+        $status = Password::broker('users')->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, $password) {
+                $user->forceFill([
+                    'password' => $password, // Direct assignment - 'hashed' cast handles hashing
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? redirect()->route('login')->with('success', __($status))
+            : back()->withInput($request->only('email'))->withErrors(['email' => [__($status)]]);
+    }
+
+    // ============================================
+    // THIRD PARTY AUTHENTICATION
+    // ============================================
+
     public function auth0Redirect()
     {
         /** @var \Auth0\Laravel\Auth0 $auth0 */
@@ -197,7 +299,7 @@ class AuthController extends Controller
                 $user = User::create([
                     'name' => $userInfo['name'] ?? $userInfo['nickname'] ?? 'Auth0 User',
                     'email' => $userInfo['email'],
-                    'password' => Hash::make(Str::random(32)),
+                    'password' => Str::random(32),
                     'email_verified_at' => now(),
                 ]);
             }
@@ -237,7 +339,7 @@ class AuthController extends Controller
                 $user = User::create([
                     'name' => $googleUser->getName() ?? 'User',
                     'email' => $googleUser->getEmail(),
-                    'password' => Hash::make(Str::random(24)),
+                    'password' => Str::random(24),
                     'google_id' => $googleUser->getId(),
                     'email_verified_at' => now(),
                 ]);

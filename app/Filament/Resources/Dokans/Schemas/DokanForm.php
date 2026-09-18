@@ -7,6 +7,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Hash;
 
 class DokanForm
 {
@@ -22,8 +23,11 @@ class DokanForm
                     ->email()
                     ->required(),
 
-                TextInput::make('password')
-                    ->password(),
+              TextInput::make('password')
+                    ->password()
+                    ->required(fn (string $operation): bool => $operation === 'create')
+                    ->dehydrated(fn (?string $state) => filled($state))
+                    ->dehydrateStateUsing(fn (string $state) => Hash::make($state)),
 
                 TextInput::make('company_name')
                     ->required(),

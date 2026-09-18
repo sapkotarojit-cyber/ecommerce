@@ -40,24 +40,21 @@ return [
     */
 
     'guards' => [
-        'web' => [
-            'driver' => 'session',
-            'provider' => 'users',
-        ],
-
-        'admin' => [
-            'driver' => 'session',
-            'provider' => 'admins',
-
-
+    'web' => [
+        'driver' => 'session',
+        'provider' => 'users',
     ],
 
-
-        'dokan' => [
-            'driver' => 'session',
-            'provider' => 'dokans',
-        ],
+    'admin' => [
+        'driver' => 'session',
+        'provider' => 'admins',
     ],
+
+    'dokan' => [
+        'driver' => 'session',
+        'provider' => 'dokans',
+    ],
+],
     /*
     |--------------------------------------------------------------------------
     | User Providers
@@ -86,15 +83,15 @@ return [
         //     'table' => 'users',
         // ],
 
-        'admins' => [
-            'driver' => 'eloquent',
-            'model' => Admin::class,
-        ],
+       'admins' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\User::class, 
+    ],
 
-         'dokans' => [
-            'driver' => 'eloquent',
-            'model' => Dokan::class,
-        ],
+    'dokans' => [
+        'driver' => 'eloquent',
+        'model' => App\Models\Dokan::class,
+    ],
     ],
 
     /*
@@ -125,18 +122,18 @@ return [
         ],
 
          'admins' => [
-            'provider' => 'admins',
-            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
-            'expire' => 60,
-            'throttle' => 60,
-        ],
+    'provider' => 'admins',
+    'table' => 'admin_password_reset_tokens',
+    'expire' => 60,
+    'throttle' => 60,
+],
 
-         'dokans' => [
-            'provider' => 'dokans',
-            'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
-            'expire' => 60,
-            'throttle' => 60,
-        ],
+'dokans' => [
+    'provider' => 'dokans',
+    'table' => 'dokan_password_reset_tokens',
+    'expire' => 60,
+    'throttle' => 60,
+],
     ],
 
     /*

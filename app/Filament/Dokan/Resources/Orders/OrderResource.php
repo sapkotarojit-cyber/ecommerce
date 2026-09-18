@@ -6,6 +6,7 @@ use App\Filament\Dokan\Resources\Orders\Pages\EditOrder;
 use App\Filament\Dokan\Resources\Orders\Pages\ListOrders;
 use App\Filament\Dokan\Resources\Orders\Schemas\OrderForm;
 use App\Filament\Dokan\Resources\Orders\Tables\OrdersTable;
+use App\Filament\Resources\OrderResource\RelationManagers\OrderItemsRelationManager;
 use App\Models\Order;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -59,10 +60,14 @@ class OrderResource extends Resource
         return OrdersTable::configure($table);
     }
 
+    
+    
     public static function getRelations(): array
-    {
-        return [];
-    }
+{
+    return [
+        OrderItemsRelationManager::class,
+    ];
+}
 
     public static function getPages(): array
     {

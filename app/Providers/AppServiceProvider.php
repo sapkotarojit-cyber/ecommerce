@@ -2,24 +2,24 @@
 
 namespace App\Providers;
 
-use Illuminate\Database\Eloquent\Model;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        //
+        $this->app->bind(LogoutResponseContract::class, fn () => new class implements LogoutResponseContract {
+            public function toResponse($request): RedirectResponse
+            {
+                return redirect('/'); // Redirects to your web root upon logout
+            }
+        });
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-      Model::unguard();
+        //
     }
 }

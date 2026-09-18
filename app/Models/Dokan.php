@@ -2,33 +2,32 @@
 
 namespace App\Models;
 
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
+use Filament\Panel;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Filament\Models\Contracts\HasName;
 
-class Dokan extends Authenticatable implements HasName
-
+class Dokan extends Authenticatable implements HasName, FilamentUser
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use Notifiable;
 
-    // Define status constants here
+    // Define status constants expected by canAccessPanel()
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
-    public function getFilamentName(): string
-{
-    return $this->company_name ?: $this->email;
-}
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Allows login only if approved
+        return $this->status === self::STATUS_APPROVED;
+    }
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
+    public function getFilamentName(): string
+    {
+        return $this->company_name ?: $this->email;
+    }
+
     protected $fillable = [
         'user_id',
         'company_name',
@@ -42,19 +41,11 @@ class Dokan extends Authenticatable implements HasName
         'rejection_comment',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [

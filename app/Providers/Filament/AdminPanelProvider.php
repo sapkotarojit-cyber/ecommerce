@@ -30,8 +30,12 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->homeUrl('/')
+            ->brandName('Empire Innovation')
             ->registration() 
             ->authGuard('admin')
+            ->authPasswordBroker('admins')
+            ->passwordReset()
             ->colors([
                 'primary' => Color::Amber,
             ])
