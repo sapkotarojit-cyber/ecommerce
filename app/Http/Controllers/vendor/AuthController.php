@@ -21,10 +21,11 @@ class AuthController extends Controller
         ]);
 
         if (Auth::guard('dokan')->attempt($request->only('email', 'password'))) {
+            $request->session()->regenerate();
             return redirect()->intended('/dokan/dashboard');
         }
 
-        return back()->withErrors(['email' => 'Invalid credentials']);
+        return back()->withErrors(['email' => 'Invalid vendor credentials provided.'])->onlyInput('email');
     }
 
     public function logout(Request $request)
@@ -32,6 +33,7 @@ class AuthController extends Controller
         Auth::guard('dokan')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        return redirect('/vendor/login');
+
+        return redirect('/vendor/login')->with('success', 'Logged out successfully.');
     }
 }

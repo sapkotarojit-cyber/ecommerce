@@ -6,8 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Empireinnovation PVT.LTD - @yield('title', 'Multi-Vendor Marketplace')</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     
+    <!-- Clean Favicon Definitions -->
+    <link rel="icon" type="image/png" href="{{ asset('logo1.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('logo1.png') }}">
+    <link rel="shortcut icon" href="{{ asset('logo1.png') }}">
+
+    <meta name="description" content="Shop medical and surgical supplies from thousands of trusted sellers on Empire Innovation">
+    <title>Empire Innovation - Multi-Seller Marketplace</title>      
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

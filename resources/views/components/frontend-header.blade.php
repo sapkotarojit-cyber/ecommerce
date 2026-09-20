@@ -22,16 +22,9 @@
     <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between gap-4">
             <!-- Brand Logo -->
-            <a href="{{ route('home') }}" class="flex items-center gap-2">
-                <div class="w-10 h-10 bg-[#c9a84c] rounded-lg flex items-center justify-center">
-                    <span class="text-[#0f1a3a] font-extrabold text-xl">E</span>
-                </div>
-                <div class="flex flex-col">
-                    <span class="text-[#0f1a3a] font-bold text-lg leading-tight tracking-tight">Empireinnovation</span>
-                    <span class="text-[#c9a84c] font-semibold text-xs tracking-wider">PVT. LTD</span>
-                </div>
-            </a>
-
+ <a href="{{ route('home') }}" class="flex items-center h-16 md:h-20 py-1">
+    <img src="{{ asset('images/logo2.png') }}" alt="Empire Innovation" class="h-full w-auto object-contain">
+</a>
             <!-- Search Bar - Desktop -->
             <div class="hidden md:block flex-1 max-w-xl">
                 <form action="{{ route('products') }}" method="GET" class="relative group">

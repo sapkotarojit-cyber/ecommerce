@@ -6,8 +6,22 @@ use App\Http\Controllers\Frontend\PageController;
 use App\Http\Controllers\Frontend\ShippingAddressController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\OrderController;
+use App\Http\Controllers\Frontend\ProfileController;
 
-// Public Routes
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider and all of them will
+| be assigned to the "web" middleware group. Make something great!
+|
+*/
+
+// ============================================
+// PUBLIC ROUTES (No auth required)
+// ============================================
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/about', [PageController::class, 'about'])->name('about');
 Route::get('dokan-registration', [PageController::class, 'dokan_registration'])->name('dokan_registration');
@@ -15,10 +29,6 @@ Route::post('dokan-registration', [PageController::class, 'dokan_registration_su
 Route::get('/products', [PageController::class, 'products'])->name('products');
 Route::get('/product/{id}', [PageController::class, 'product'])->name('product');
 Route::get('/support', [PageController::class, 'support'])->name('support');
-
-// Public Track Order Routes
-Route::get('/track-order', [OrderController::class, 'trackForm'])->name('orders.track');
-Route::post('/track-order', [OrderController::class, 'trackResult'])->name('orders.track.submit');
 
 // Public Cart View
 Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
@@ -35,7 +45,7 @@ Route::post('/vendor/check-email', [AuthController::class, 'checkVendorEmail'])-
 // ============================================
 // GUEST ROUTES (Unauthenticated)
 // ============================================
-Route::middleware('unauth')->group(function () {
+Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'login'])->name('login');
     Route::post('/login', [AuthController::class, 'loginSubmit'])
         ->middleware('throttle:5,1')
@@ -47,17 +57,16 @@ Route::middleware('unauth')->group(function () {
         ->name('register.submit');
 });
 
-    // ============================================
-    // FORGOT & RESET PASSWORD ROUTES
-    // ============================================
-    Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
-    Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
-    Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
-
+// ============================================
+// FORGOT & RESET PASSWORD ROUTES
+// ============================================
+Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])->name('password.request');
+Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
+Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])->name('password.reset');
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
 
 // ============================================
-// VERIFICATION ROUTES (Exempt from UnAuthMiddleware)
+// VERIFICATION ROUTES
 // ============================================
 Route::get('/verify-email', [AuthController::class, 'showVerifyForm'])->name('verify.show');
 Route::post('/verify-email', [AuthController::class, 'verifyCode'])
@@ -68,16 +77,16 @@ Route::post('/resend-verification-code', [AuthController::class, 'resendCode'])
     ->name('verify.resend');
 
 // ============================================
-// AUTHENTICATED ROUTES
+// AUTHENTICATED ROUTES (Requires Login)
 // ============================================
 Route::middleware('auth')->group(function () {
     Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
-    Route::get('/profile', [App\Http\Controllers\Frontend\ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [App\Http\Controllers\Frontend\ProfileController::class, 'update'])->name('profile.update');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     
-    Route::get('/settings', [App\Http\Controllers\Frontend\ProfileController::class, 'settings'])->name('settings');
-    Route::put('/settings/password', [App\Http\Controllers\Frontend\ProfileController::class, 'updatePassword'])->name('settings.password');
+    Route::get('/settings', [ProfileController::class, 'settings'])->name('settings');
+    Route::put('/settings/password', [ProfileController::class, 'updatePassword'])->name('settings.password');
 
     // Shipping Address Routes
     Route::prefix('shipping-address')->name('shipping-address.')->group(function () {
@@ -101,7 +110,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{id}', [CartController::class, 'destroy'])->name('destroy');
     });
 
-    // Order Routes
+    // Order & Dashboard Routes (Protected)
     Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('index');
         Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
@@ -110,6 +119,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');
     });
+
+    // Track Order Routes (Protected - Requires Login)
+    Route::get('/track-order', [OrderController::class, 'trackForm'])->name('orders.track');
+    Route::post('/track-order', [OrderController::class, 'trackResult'])->name('orders.track.submit');
 
     Route::get('/bank-transfer/pay', [OrderController::class, 'bankPaymentPage'])->name('bank.pay');
 });

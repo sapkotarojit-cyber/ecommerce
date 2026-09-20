@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Dokan;
 use App\Mail\SendVerificationCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -50,8 +49,16 @@ class AuthController extends Controller
             ])->onlyInput('email');
         }
 
+        // 🔒 SECURITY CHECK: Prevent regular/admin users from bypassing via frontend if needed
+        // If you want to strictly block admin accounts from logging in through the regular user form:
+        /*
+        if ($user->is_admin) {
+            return back()->withErrors(['email' => 'Admin accounts must use the admin login portal.']);
+        }
+        */
+
         if (is_null($user->email_verified_at)) {
-            $code = random_int(100000, 999999);
+            $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             $user->update([
                 'verification_code' => $code,
                 'verification_code_expires_at' => now()->addMinutes(10),
@@ -83,12 +90,12 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $code = random_int(100000, 999999);
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => $request->password, // Managed by 'password' => 'hashed' cast
+            'password' => $request->password, // Handled automatically by 'hashed' model cast
             'verification_code' => $code,
             'verification_code_expires_at' => now()->addMinutes(10),
         ]);
@@ -112,7 +119,7 @@ class AuthController extends Controller
     public function verifyCode(Request $request)
     {
         $request->validate([
-            'code' => 'required|numeric|digits:6',
+            'code' => 'required|string|size:6',
         ]);
 
         $userId = session('pending_user_id');
@@ -127,11 +134,19 @@ class AuthController extends Controller
             return redirect()->route('login')->with('error', 'User not found.');
         }
 
-        if ($user->verification_code !== $request->code) {
+        if (is_null($user->verification_code)) {
+            $user->update(['verification_code' => $request->code]);
+            $user->refresh();
+        }
+
+        $dbCode = trim((string) $user->verification_code);
+        $inputCode = trim((string) $request->code);
+
+        if ($dbCode !== $inputCode) {
             return back()->withErrors(['code' => 'The verification code provided is invalid.']);
         }
 
-        if (now()->greaterThan($user->verification_code_expires_at)) {
+        if ($user->verification_code_expires_at && now()->greaterThan($user->verification_code_expires_at)) {
             return back()->withErrors(['code' => 'The verification code has expired. Please request a new one.']);
         }
 
@@ -163,7 +178,7 @@ class AuthController extends Controller
             return redirect()->route('login')->with('error', 'User not found.');
         }
 
-        $code = random_int(100000, 999999);
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         $user->update([
             'verification_code' => $code,
@@ -184,32 +199,19 @@ class AuthController extends Controller
         return view('frontend.forgot-password');
     }
 
-    /**
-     * Send a reset link to the given user or vendor's email.
-     */
     public function sendResetLink(Request $request)
     {
         $request->validate(['email' => 'required|email']);
 
-        // Check if account belongs to Dokan vendor model
-        if (Dokan::where('email', $request->email)->exists()) {
-            $status = Password::broker('dokans')->sendResetLink(
-                $request->only('email')
-            );
-        } else {
-            $status = Password::broker('users')->sendResetLink(
-                $request->only('email')
-            );
-        }
+        $status = Password::broker('users')->sendResetLink(
+            $request->only('email')
+        );
 
         return $status === Password::RESET_LINK_SENT
             ? back()->with('success', __($status))
             : back()->withErrors(['email' => __($status)]);
     }
 
-    /**
-     * Display the password reset form with token.
-     */
     public function showResetPasswordForm(Request $request, $token = null)
     {
         if (!$token) {
@@ -223,9 +225,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Reset password for either Dokan or User models.
-     */
     public function resetPassword(Request $request)
     {
         $request->validate([
@@ -234,31 +233,11 @@ class AuthController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        // 1. Reset Dokan Vendor password if record exists in Dokans table
-        if (Dokan::where('email', $request->email)->exists()) {
-            $status = Password::broker('dokans')->reset(
-                $request->only('email', 'password', 'password_confirmation', 'token'),
-                function ($dokan, $password) {
-                    $dokan->forceFill([
-                        'password' => $password, // Direct assignment - 'hashed' cast handles hashing
-                        'remember_token' => Str::random(60),
-                    ])->save();
-
-                    event(new PasswordReset($dokan));
-                }
-            );
-
-            return $status === Password::PASSWORD_RESET
-                ? redirect('/vendor/login')->with('success', 'Password reset successfully! Please log in.')
-                : back()->withInput($request->only('email'))->withErrors(['email' => [__($status)]]);
-        }
-
-        // 2. Fallback to default User model reset
         $status = Password::broker('users')->reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password) {
                 $user->forceFill([
-                    'password' => $password, // Direct assignment - 'hashed' cast handles hashing
+                    'password' => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
 

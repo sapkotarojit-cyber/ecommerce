@@ -41,9 +41,9 @@ return [
 
     'guards' => [
     'web' => [
-        'driver' => 'session',
-        'provider' => 'users',
-    ],
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
 
     'admin' => [
         'driver' => 'session',
@@ -51,9 +51,9 @@ return [
     ],
 
     'dokan' => [
-        'driver' => 'session',
-        'provider' => 'dokans',
-    ],
+            'driver' => 'session',
+            'provider' => 'dokans',
+        ],
 ],
     /*
     |--------------------------------------------------------------------------
@@ -85,13 +85,13 @@ return [
 
        'admins' => [
         'driver' => 'eloquent',
-        'model' => App\Models\User::class, 
+        'model' => App\Models\Admin::class,
     ],
 
     'dokans' => [
-        'driver' => 'eloquent',
-        'model' => App\Models\Dokan::class,
-    ],
+            'driver' => 'eloquent',
+            'model' => App\Models\Dokan::class,
+        ],
     ],
 
     /*
@@ -122,19 +122,20 @@ return [
         ],
 
          'admins' => [
-    'provider' => 'admins',
-    'table' => 'admin_password_reset_tokens',
-    'expire' => 60,
-    'throttle' => 60,
+            'provider' => 'admins',
+            'table' => 'admin_password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
 ],
 
 'dokans' => [
-    'provider' => 'dokans',
-    'table' => 'dokan_password_reset_tokens',
-    'expire' => 60,
-    'throttle' => 60,
-],
+            'provider' => 'dokans',
+            'table' => 'dokan_password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
     ],
+    
 
     /*
     |--------------------------------------------------------------------------

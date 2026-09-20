@@ -32,10 +32,10 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->homeUrl('/')
             ->brandName('Empire Innovation')
-            ->registration() 
+            ->registration(\App\Filament\Pages\Auth\Register::class)
             ->authGuard('admin')
             ->authPasswordBroker('admins')
-            ->passwordReset()
+            ->passwordReset() 
             ->colors([
                 'primary' => Color::Amber,
             ])
