@@ -44,7 +44,7 @@ class OrderForm
                             ->label('Customer Shipping Address')
                             ->relationship(
                                 'shippingAddress',
-                                'full_address'
+                                'address' // Changed from 'full_address' to an existing column like 'address'
                             )
                             ->disabled()
                             ->dehydrated(false),

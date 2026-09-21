@@ -29,6 +29,7 @@ class DokanPanelProvider extends PanelProvider
         return $panel
             ->id('dokan')
             ->path('vendor')
+            ->favicon(asset('logo1.png'))
             ->login()
             ->homeUrl('/')
             ->brandName(function () {

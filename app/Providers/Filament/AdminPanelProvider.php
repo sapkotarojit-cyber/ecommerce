@@ -29,6 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->favicon(asset('logo1.png'))
             ->login()
             ->homeUrl('/')
             ->brandName('Empire Innovation')
