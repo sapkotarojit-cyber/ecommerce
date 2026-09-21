@@ -45,13 +45,18 @@
             <!-- Action Icons -->
             <div class="flex items-center gap-4">
                 <!-- Cart -->
-                <a href="{{ route('cart.index') }}" class="relative group">
-                    <div class="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                        <svg class="w-6 h-6 text-gray-700 group-hover:text-[#0f1a3a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                        </svg>
-                    </div>
+                   <a href="{{ route('cart.index') }}" class="relative text-gray-700 hover:text-indigo-600 flex items-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                    </svg>
+                    @if(isset($globalCartCount) && $globalCartCount > 0)
+                        <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                            {{ $globalCartCount }}
+                        </span>
+                    @endif
                 </a>
+
+             
 
                 <!-- Account -->
                 @auth

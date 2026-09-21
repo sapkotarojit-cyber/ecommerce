@@ -36,21 +36,22 @@
                                 <p class="text-sm text-gray-500 py-2">No shipping addresses found. Please add an address to proceed.</p>
                             </div>
 
-                            <div id="address-list-container" class="space-y-3 {{ $addresses->isEmpty() ? 'hidden' : '' }}">
-                            <!-- Shipping Addresses Loop -->
-                                    @if(isset($addresses) && count($addresses) > 0)
-                                        @foreach($addresses as $address)
-                                            <label class="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50">
-                                                <input type="radio" name="shipping_address_id" value="{{ $address->id }}" {{ $address->is_default_shipping ? 'checked' : '' }} class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1">
-                                                <div>
-                                                    <p class="font-semibold text-gray-800">{{ $address->name }} <span class="text-xs font-normal text-gray-500">({{ $address->address_type }})</span></p>
-                                                    <p class="text-sm text-gray-600">{{ $address->address }}</p>
-                                                    <p class="text-sm text-gray-600">{{ $address->region }} | Phone: {{ $address->phone }}</p>
-                                                </div>
-                                            </label>
-                                        @endforeach
-                                    @endif
-                            </div>
+                            <div id="address-list-container" class="space-y-3">
+    @if(isset($addresses) && $addresses->count() > 0)
+        @foreach($addresses as $address)
+            <label class="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50">
+                <input type="radio" name="shipping_address_id" value="{{ $address->id }}" {{ $address->is_default_shipping ? 'checked' : '' }} class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1">
+                <div>
+                    <p class="font-semibold text-gray-800">{{ $address->name }} <span class="text-xs font-normal text-gray-500">({{ $address->address_type }})</span></p>
+                    <p class="text-sm text-gray-600">{{ $address->address }}</p>
+                    <p class="text-sm text-gray-600">{{ $address->region }} | Phone: {{ $address->phone }}</p>
+                </div>
+            </label>
+        @endforeach
+    @else
+        <p class="text-sm text-gray-500 py-2">No shipping addresses found. Please add an address to proceed.</p>
+    @endif
+</div>
 
                             @error('shipping_address_id')
                                 <p class="text-red-500 text-xs font-medium mt-2">{{ $message }}</p>
@@ -94,44 +95,41 @@
                         </div>
 
                         <div class="space-y-4 mb-6">
-                            @php $itemIndex = 0; @endphp
-                            @if(isset($vendorTotal) && count($vendorTotal) > 0)
-                                @foreach($vendorTotal as $dokanId =>$vendorGroup)
-                                    <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
-                                            Store: {{ $vendorGroup['dokan']->name ?? 'Default Store' }}
-                                        </div>
-                                        <div class="space-y-2 mb-3">
-                                          <!-- Order Summary Loops -->
-                                            @if(isset($vendorTotal) && count($vendorTotal) > 0)
-                                                @foreach($vendorTotal as $dokanId => $vendorGroup)
-                                                    <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                                                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
-                                                            Store: {{ $vendorGroup['dokan']->name ?? 'Default Store' }}
-                                                        </div>
-                                                        <div class="space-y-2 mb-3">
-                                                            @if(isset($vendorGroup['items']) && count($vendorGroup['items']) > 0)
-                                                                @foreach($vendorGroup['items'] as $item)
-                                                                    <!-- Item loop content -->
-                                                                @endforeach
-                                                            @endif
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            @endif
-                                        </div>
-                                        <div class="flex justify-between text-xs text-gray-500 font-medium">
-                                            <span>Store Subtotal</span>
-                                            <span>${{ number_format($vendorGroup['subtotal'] ?? 0, 2) }}</span>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            @endif
-                        </div>
+    @if(isset($vendorTotal) && is_array($vendorTotal) && count($vendorTotal) > 0)
+        @foreach($vendorTotal as $dokanId => $vendorGroup)
+            <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2 flex items-center">
+                    Store: {{ $vendorGroup['dokan']->company_name ?? $vendorGroup['dokan']->name ?? 'Default Store' }}
+                </div>
+                <div class="space-y-2 mb-3">
+                    @if(isset($vendorGroup['items']) && count($vendorGroup['items']) > 0)
+                        @foreach($vendorGroup['items'] as $item)
+                            @php
+                                $price = $item->varient->price ?? 0;
+                                $discount = $item->varient->discount ?? 0;
+                                $finalPrice = $price - ($price * $discount / 100);
+                            @endphp
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-gray-600 truncate pr-2">
+                                    {{ $item->product->title ?? 'Product' }} <span class="text-xs text-gray-400">x{{ $item->qty }}</span>
+                                </span>
+                                <span class="font-medium text-gray-900">Rs. {{ number_format($finalPrice * $item->qty, 2) }}</span>
+                            </div>
+                        @endforeach
+                    @endif
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 font-medium bg-gray-50 p-2 rounded">
+                    <span>Store Subtotal</span>
+                    <span>Rs. {{ number_format($vendorGroup['subtotal'] ?? 0, 2) }}</span>
+                </div>
+            </div>
+        @endforeach
+    @endif
+</div>
 
                         <div class="pt-4 border-t border-gray-200 flex justify-between items-center mb-6">
                             <span class="text-base font-bold text-gray-900">Total Amount</span>
-                            <span class="text-xl font-extrabold text-gray-900">${{ number_format($grandTotal ?? 0, 2) }}</span>
+                            <span class="text-xl font-extrabold text-indigo-600">Rs. {{ number_format($grandTotal ?? 0, 2) }}</span>
                         </div>
 
                         <button id="submit-order-btn" type="submit" class="w-full py-3.5 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider" {{ $addresses->isEmpty() ? 'disabled' : '' }}>

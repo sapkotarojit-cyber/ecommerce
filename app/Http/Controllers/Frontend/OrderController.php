@@ -38,16 +38,41 @@ class OrderController extends Controller
     }
 
     /**
-     * Show checkout page with user's cart items and shipping addresses.
+     * Store selected cart items in session and redirect to checkout page.
+     */
+    public function postCheckoutSelected(Request $request)
+    {
+        $request->validate([
+            'selected_items' => 'required|array|min:1',
+            'selected_items.*' => 'exists:carts,id',
+        ], [
+            'selected_items.required' => 'Please select at least one item from your cart to checkout.'
+        ]);
+
+        // Save selected cart item IDs in the session
+        session()->put('checkout_cart_ids', $request->selected_items);
+
+        return redirect()->route('orders.checkout');
+    }
+
+    /**
+     * Show checkout page with user's selected cart items and shipping addresses.
      */
     public function checkout()
     {
+        $selectedCartIds = session()->get('checkout_cart_ids');
+
+        if (!$selectedCartIds || empty($selectedCartIds)) {
+            return redirect()->route('cart.index')->with('error', 'Please select items from your cart to checkout.');
+        }
+
         $cartItems = Cart::where('user_id', Auth::id())
+            ->whereIn('id', $selectedCartIds)
             ->with(['product', 'varient', 'dokan'])
             ->get();
 
         if ($cartItems->isEmpty()) {
-            return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
+            return redirect()->route('cart.index')->with('error', 'Your selected cart items are empty.');
         }
 
         $addresses = ShippingAddress::where('user_id', Auth::id())->get();
@@ -80,7 +105,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Store order placement and handle payment routing (COD, eSewa, Bank Transfer).
+     * Store order placement and handle payment routing (COD, eSewa, Bank Transfer) for selected items only.
      */
     public function store(Request $request)
     {
@@ -88,6 +113,12 @@ class OrderController extends Controller
             'shipping_address_id' => 'required|exists:shipping_addresses,id',
             'payment_method' => 'required|string',
         ]);
+
+        $selectedCartIds = session()->get('checkout_cart_ids');
+
+        if (!$selectedCartIds || empty($selectedCartIds)) {
+            return redirect()->route('cart.index')->with('error', 'No selected checkout items found in session.');
+        }
 
         $paymentMethod = strtolower(trim($request->payment_method));
 
@@ -98,12 +129,13 @@ class OrderController extends Controller
 
             try {
                 $cartItems = Cart::where('user_id', Auth::id())
+                    ->whereIn('id', $selectedCartIds)
                     ->with(['product', 'varient'])
                     ->get();
 
                 if ($cartItems->isEmpty()) {
                     DB::rollBack();
-                    return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
+                    return redirect()->route('cart.index')->with('error', 'Your selected cart items are empty.');
                 }
 
                 $groupedByVendor = $cartItems->groupBy('dokan_id');
@@ -151,7 +183,7 @@ class OrderController extends Controller
                     'master_tracking' => $masterTracking,
                 ]);
 
-                Cart::where('user_id', Auth::id())->delete();
+                // Cart items NOT deleted here so they persist if payment is cancelled/fails.
                 DB::commit();
 
                 return $this->initiateEsewaPayment($masterTracking, $grandTotalAmount);
@@ -169,12 +201,13 @@ class OrderController extends Controller
 
             try {
                 $cartItems = Cart::where('user_id', Auth::id())
+                    ->whereIn('id', $selectedCartIds)
                     ->with(['product', 'varient'])
                     ->get();
 
                 if ($cartItems->isEmpty()) {
                     DB::rollBack();
-                    return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
+                    return redirect()->route('cart.index')->with('error', 'Your selected cart items are empty.');
                 }
 
                 $groupedByVendor = $cartItems->groupBy('dokan_id');
@@ -207,7 +240,6 @@ class OrderController extends Controller
                         $discount = $item->varient->discount ?? 0;
                         $finalPrice = $price - ($price * $discount / 100);
 
-                        // Fixed: Added 'qty' and 'amount' to resolve the 1364 Field 'qty' doesn't have a default value error
                         OrderItem::create([
                             'order_id' => $order->id,
                             'product_id' => $item->product_id,
@@ -224,7 +256,7 @@ class OrderController extends Controller
                     'total_amount' => $grandTotalAmount,
                 ]);
 
-                Cart::where('user_id', Auth::id())->delete();
+                // Cart items NOT deleted here so they persist if payment is cancelled/fails.
                 DB::commit();
 
                 return redirect()->route('bank.pay');
@@ -240,17 +272,18 @@ class OrderController extends Controller
 
         try {
             $cartItems = Cart::where('user_id', Auth::id())
+                ->whereIn('id', $selectedCartIds)
                 ->with(['product', 'varient'])
                 ->get();
 
             if ($cartItems->isEmpty()) {
                 DB::rollBack();
-                return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
+                return redirect()->route('cart.index')->with('error', 'Your selected cart items are empty.');
             }
 
             foreach ($cartItems as $item) {
                 if ($item->varient && $item->varient->qty < $item->qty) {
-                    throw new \Exception("Insufficient stock for '{$item->product->name}'. Only {$item->varient->qty} left.");
+                    throw new \Exception("Insufficient stock for '{$item->product->title}'. Only {$item->varient->qty} left.");
                 }
             }
 
@@ -295,7 +328,10 @@ class OrderController extends Controller
                 }
             }
 
-            Cart::where('user_id', Auth::id())->delete();
+            // Clear ONLY the selected checked items from cart on COD placement
+            Cart::where('user_id', Auth::id())->whereIn('id', $selectedCartIds)->delete();
+            session()->forget('checkout_cart_ids');
+            
             DB::commit();
 
             return redirect()->route('orders.index')->with('success', 'Order placed successfully!');
@@ -381,7 +417,14 @@ class OrderController extends Controller
                 ]);
 
             if ($updatedCount > 0) {
+                // Clear ONLY the selected checked items from cart upon successful payment
+                $selectedCartIds = session()->get('checkout_cart_ids');
+                if ($selectedCartIds) {
+                    Cart::where('user_id', Auth::id())->whereIn('id', $selectedCartIds)->delete();
+                }
+                session()->forget('checkout_cart_ids');
                 session()->forget('pending_gateway_order');
+
                 return redirect()->route('orders.index')->with('success', 'Payment verified and order placed successfully via eSewa!');
             }
 
@@ -429,7 +472,14 @@ class OrderController extends Controller
             ]);
 
         if ($updatedCount > 0) {
+            // Clear ONLY the selected checked items from cart upon bank receipt upload
+            $selectedCartIds = session()->get('checkout_cart_ids');
+            if ($selectedCartIds) {
+                Cart::where('user_id', Auth::id())->whereIn('id', $selectedCartIds)->delete();
+            }
+            session()->forget('checkout_cart_ids');
             session()->forget('pending_gateway_order');
+
             return redirect()->route('orders.index')->with('success', 'Bank transfer receipt submitted successfully! Awaiting verification.');
         }
 
@@ -445,6 +495,7 @@ class OrderController extends Controller
         }
 
         session()->forget('pending_gateway_order');
+        // checkout_cart_ids is intentionally NOT forgotten so items remain checked in the cart!
         return redirect()->route('cart.index')->with('error', 'eSewa payment was cancelled or failed.');
     }
 

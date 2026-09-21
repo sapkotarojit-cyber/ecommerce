@@ -81,9 +81,10 @@
                 <h2 class="text-base font-semibold text-gray-900 pb-3 mb-3 border-b border-gray-100">Shipping Address</h2>
                 @if($order->shipping_address)
                     <div class="text-sm text-gray-600 space-y-1">
-                        <p class="font-semibold text-gray-900">{{ $order->shipping_address->title }}</p>
-                        <p>{{ $order->shipping_address->contact_no }}</p>
-                        <p>{{ $order->shipping_address->full_address }}</p>
+                        <p class="font-semibold text-gray-900">{{ $order->shipping_address->name ?? $order->shipping_address->title ?? 'N/A' }} <span class="text-xs font-normal text-gray-500">({{ $order->shipping_address->address_type ?? '' }})</span></p>
+                        <p>{{ $order->shipping_address->address ?? $order->shipping_address->full_address ?? '' }}</p>
+                        <p>{{ $order->shipping_address->region ?? '' }}</p>
+                        <p class="text-gray-500">Phone: {{ $order->shipping_address->phone ?? $order->shipping_address->contact_no ?? '' }}</p>
                     </div>
                 @else
                     <p class="text-sm text-gray-500">No shipping address attached.</p>
@@ -125,7 +126,7 @@
                     <tbody class="divide-y divide-gray-100 text-sm">
                         @foreach($order->order_items as $item)
                             @php
-                                // Parse Variant Image safely (matching the implementation in cart view)
+                                // Parse Variant Image safely
                                 $rawImages = $item->varient->images ?? [];
                                 if (is_string($rawImages)) {
                                     $decoded = json_decode($rawImages, true);
@@ -137,33 +138,35 @@
                                     return trim(str_replace(['\\', '"', '[', ']'], '', $img));
                                 }, array_filter($images));
                                 $mainImage = $images[0] ?? null;
+
+                                $unitPrice = $item->amount / max($item->qty, 1);
                             @endphp
                             <tr class="hover:bg-gray-50/50 transition-colors">
-                                <td class="py-4 px-6 font-medium text-gray-900">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
-                                            @if($mainImage)
-                                                <img src="{{ asset('storage/' . $mainImage) }}" alt="{{ $item->product->title ?? 'Product Image' }}" class="w-full h-full object-cover">
-                                            @else
-                                                <i class="fa-solid fa-image text-gray-400"></i>
-                                            @endif
+                                <td class="py-4 px-6">
+                                    <div class="flex items-center space-x-3">
+                                        @if($mainImage)
+                                            <img src="{{ asset('storage/' . $mainImage) }}" alt="Product" class="w-12 h-12 rounded-lg object-cover border border-gray-200">
+                                        @else
+                                            <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                                                <i class="fa-solid fa-box text-xs"></i>
+                                            </div>
+                                        @endif
+                                        <div>
+                                            <span class="font-medium text-gray-900 block">{{ $item->product->title ?? 'Product Name Unavailable' }}</span>
                                         </div>
-                                        <a href="{{ route('product', $item->product_id) }}" class="hover:text-indigo-600 line-clamp-2">
-                                            {{ $item->product->title ?? $item->product->name ?? 'Product' }}
-                                        </a>
                                     </div>
                                 </td>
-                                <td class="py-4 px-6 text-gray-500">
-                                    {{ $item->varient->name ?? 'Standard' }}
+                                <td class="py-4 px-6 text-gray-600">
+                                    {{ $item->varient->title ?? 'Default' }}
                                 </td>
-                                <td class="py-4 px-6 text-center text-gray-600">
+                                <td class="py-4 px-6 text-center text-gray-600 font-medium">
                                     {{ $item->qty }}
                                 </td>
                                 <td class="py-4 px-6 text-right text-gray-600">
-                                    ${{ number_format($item->amount / max(1, $item->qty), 2) }}
+                                    Rs. {{ number_format($unitPrice, 2) }}
                                 </td>
                                 <td class="py-4 px-6 text-right font-semibold text-gray-900">
-                                    ${{ number_format($item->amount, 2) }}
+                                    Rs. {{ number_format($item->amount, 2) }}
                                 </td>
                             </tr>
                         @endforeach
@@ -171,14 +174,10 @@
                 </table>
             </div>
             
-            <!-- Summary Totals -->
-            <div class="p-6 bg-gray-50/50 border-t border-gray-100 flex justify-end">
-                <div class="w-full sm:w-72 space-y-2">
-                    <div class="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-200">
-                        <span>Total Amount</span>
-                        <span class="text-xl text-indigo-600">${{ number_format($order->total_amount, 2) }}</span>
-                    </div>
-                </div>
+            <!-- Order Total Footer -->
+            <div class="p-6 bg-gray-50/50 border-t border-gray-100 flex justify-between items-center">
+                <span class="text-base font-semibold text-gray-900">Grand Total</span>
+                <span class="text-xl font-bold text-indigo-600">Rs. {{ number_format($order->total_amount, 2) }}</span>
             </div>
         </div>
 

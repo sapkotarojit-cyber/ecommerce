@@ -115,10 +115,12 @@ Route::middleware('auth')->group(function () {
     Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('index');
         Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
-        Route::post('/', [OrderController::class, 'store'])->name('store'); // Fixed from /store to root post
+        Route::post('/', [OrderController::class, 'store'])->name('store'); 
         Route::get('/{id}', [OrderController::class, 'show'])->name('show');
         Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');
+        Route::post('/cart/checkout-selected', [OrderController::class, 'postCheckoutSelected'])->name('cart.checkout.selected');
+        Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
     });
 
     // Track Order Routes (Protected - Requires Login)
