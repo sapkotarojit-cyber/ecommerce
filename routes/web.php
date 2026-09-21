@@ -88,7 +88,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [ProfileController::class, 'settings'])->name('settings');
     Route::put('/settings/password', [ProfileController::class, 'updatePassword'])->name('settings.password');
 
-    // Shipping Address Routes
+    // Shipping Address Routes (Parameter fixed to {address})
     Route::prefix('shipping-address')->name('shipping-address.')->group(function () {
         Route::get('/', [ShippingAddressController::class, 'index'])->name('index');
         Route::get('/create', [ShippingAddressController::class, 'create'])->name('create');
@@ -98,6 +98,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{address}', [ShippingAddressController::class, 'destroy'])->name('destroy');
         Route::patch('/{address}/set-default', [ShippingAddressController::class, 'setDefault'])->name('set-default');
         Route::post('/quick-store', [ShippingAddressController::class, 'quickStore'])->name('quick-store');
+        Route::post('/shipping-address/quick-store', [ShippingAddressController::class, 'quickStore'])->name('shipping-address.quick-store');
     });
 
     // Authenticated Cart Actions
@@ -114,7 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('orders')->name('orders.')->group(function () {
         Route::get('/', [OrderController::class, 'index'])->name('index');
         Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
-        Route::post('/store', [OrderController::class, 'store'])->name('store');
+        Route::post('/', [OrderController::class, 'store'])->name('store'); // Fixed from /store to root post
         Route::get('/{id}', [OrderController::class, 'show'])->name('show');
         Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
         Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');

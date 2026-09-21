@@ -11,13 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('shipping_addresses', function (Blueprint $table) {
+       Schema::create('shipping_addresses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->string('title');
-            $table->string('contact_no');
-            $table->string('full_address');
-            $table->boolean('is_default')->default(false);
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->string('name');                      
+            $table->string('phone');                   
+            $table->string('region');                    
+            $table->text('address');                     
+            $table->string('landmark')->nullable();     
+            $table->string('address_type')->default('Home'); 
+            $table->boolean('is_default_shipping')->default(false);
+            $table->boolean('is_default_billing')->default(false);
             $table->timestamps();
         });
     }

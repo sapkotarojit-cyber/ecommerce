@@ -12,39 +12,47 @@ class ShippingAddressController extends Controller
     public function index()
     {
         $addresses = ShippingAddress::where('user_id', Auth::id())
-            ->orderBy('is_default', 'desc')
+            ->orderBy('is_default_shipping', 'desc') // 👈 Fixed column name here
             ->orderBy('created_at', 'desc')
             ->paginate(9);
 
-        return view('shipping-address.index', compact('addresses'));
+        return view('frontend.shipping-address.index', compact('addresses'));
     }
 
     public function create()
     {
-        return view('shipping-address.create');
+        return view('frontend.shipping-address.create');
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'contact_no' => 'required|string|max:20',
-            'full_address' => 'required|string|max:500',
-            'is_default' => 'nullable|boolean',
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'region' => 'required|string|max:255',
+            'address' => 'required|string|max:500',
+            'landmark' => 'nullable|string|max:255',
+            'address_type' => 'required|in:Home,Office',
+            'is_default_shipping' => 'nullable|boolean',
+            'is_default_billing' => 'nullable|boolean',
         ]);
 
-        $addresses = ShippingAddress::create([
+        $address = ShippingAddress::create([
             'user_id' => Auth::id(),
-            'title' => $validated['title'],
-            'contact_no' => $validated['contact_no'],
-            'full_address' => $validated['full_address'],
-            'is_default' => $request->has('is_default') && $request->is_default == 1,
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'region' => $validated['region'],
+            'address' => $validated['address'],
+            'landmark' => $validated['landmark'] ?? null,
+            'address_type' => $validated['address_type'],
+            'is_default_shipping' => $request->has('is_default_shipping') && $request->is_default_shipping == 1,
+            'is_default_billing' => $request->has('is_default_billing') && $request->is_default_billing == 1,
         ]);
 
-        if ($addresses->is_default) {
+        if ($address->is_default_shipping) {
             ShippingAddress::where('user_id', Auth::id())
-                ->where('id', '!=', $addresses->id)
-                ->update(['is_default' => false]);
+                ->where('id', '!=', $address->id)
+                ->update(['is_default_shipping' => false]);
         }
 
         return redirect()
@@ -52,63 +60,75 @@ class ShippingAddressController extends Controller
             ->with('success', 'Shipping address added successfully!');
     }
 
-    public function quickStore(Request $request)
+
+public function quickStore(Request $request)
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'address_type' => 'required|string|max:50',
+        'phone' => 'required|string|max:20',
+        'region' => 'required|string|max:255',
+        'address' => 'required|string',
+    ]);
+
+    $address = ShippingAddress::create([
+        'user_id' => Auth::id(),
+        'name' => $request->name,
+        'address_type' => $request->address_type,
+        'phone' => $request->phone,
+        'region' => $request->region,
+        'address' => $request->address,
+        'is_default_shipping' => ShippingAddress::where('user_id', Auth::id())->doesntExist(), // Makes default if it's the first one
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Address added successfully!',
+        'address' => $address
+    ]);
+}
+
+    public function edit(ShippingAddress $address)
     {
-        $validated = $request->validate([
-            'title'        => 'required|string|max:255',
-            'contact_no'   => 'required|string|max:20',
-            'full_address' => 'required|string|max:500',
-        ]);
-
-        $hasAddresses = ShippingAddress::where('user_id', Auth::id())->exists();
-
-        $address = ShippingAddress::create([
-            'user_id'      => Auth::id(),
-            'title'        => $validated['title'],
-            'contact_no'   => $validated['contact_no'],
-            'full_address' => $validated['full_address'],
-            'is_default'   => !$hasAddresses,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'address' => $address,
-        ]);
-    }
-
-    public function edit(ShippingAddress $addresses)
-    {
-        if ($addresses->user_id !== Auth::id()) {
+        if ($address->user_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
-        return view('frontend.shipping-addresses.edit', compact('address'));
+        return view('frontend.shipping-address.edit', compact('address'));
     }
 
-    public function update(Request $request, ShippingAddress $addresses)
+    public function update(Request $request, ShippingAddress $address)
     {
-        if ($addresses->user_id !== Auth::id()) {
+        if ($address->user_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'contact_no' => 'required|string|max:20',
-            'full_address' => 'required|string|max:500',
-            'is_default' => 'nullable|boolean',
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'region' => 'required|string|max:255',
+            'address' => 'required|string|max:500',
+            'landmark' => 'nullable|string|max:255',
+            'address_type' => 'required|in:Home,Office',
+            'is_default_shipping' => 'nullable|boolean',
+            'is_default_billing' => 'nullable|boolean',
         ]);
 
-        $addresses->update([
-            'title' => $validated['title'],
-            'contact_no' => $validated['contact_no'],
-            'full_address' => $validated['full_address'],
-            'is_default' => $request->has('is_default') && $request->is_default == 1,
+        $address->update([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'region' => $validated['region'],
+            'address' => $validated['address'],
+            'landmark' => $validated['landmark'] ?? null,
+            'address_type' => $validated['address_type'],
+            'is_default_shipping' => $request->has('is_default_shipping') && $request->is_default_shipping == 1,
+            'is_default_billing' => $request->has('is_default_billing') && $request->is_default_billing == 1,
         ]);
 
-        if ($addresses->is_default) {
+        if ($address->is_default_shipping) {
             ShippingAddress::where('user_id', Auth::id())
-                ->where('id', '!=', $addresses->id)
-                ->update(['is_default' => false]);
+                ->where('id', '!=', $address->id)
+                ->update(['is_default_shipping' => false]);
         }
 
         return redirect()
@@ -116,9 +136,9 @@ class ShippingAddressController extends Controller
             ->with('success', 'Shipping address updated successfully!');
     }
 
-    public function destroy(ShippingAddress $addresses)
+    public function destroy(ShippingAddress $address)
     {
-        if ($addresses->user_id !== Auth::id()) {
+        if ($address->user_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -129,13 +149,13 @@ class ShippingAddressController extends Controller
                 ->with('error', 'You cannot delete your only shipping address. Add a new one first.');
         }
 
-        $deletedDefault = $addresses->is_default;
-        $addresses->delete();
+        $deletedDefault = $address->is_default_shipping;
+        $address->delete();
 
         if ($deletedDefault) {
             $newDefault = ShippingAddress::where('user_id', Auth::id())->first();
             if ($newDefault) {
-                $newDefault->update(['is_default' => true]);
+                $newDefault->update(['is_default_shipping' => true]);
             }
         }
 
@@ -144,14 +164,14 @@ class ShippingAddressController extends Controller
             ->with('success', 'Shipping address deleted successfully!');
     }
 
-    public function setDefault(ShippingAddress $addresses)
+    public function setDefault(ShippingAddress $address)
     {
-        if ($addresses->user_id !== Auth::id()) {
+        if ($address->user_id !== Auth::id()) {
             abort(403, 'Unauthorized action.');
         }
 
-        ShippingAddress::where('user_id', Auth::id())->update(['is_default' => false]);
-        $addresses->update(['is_default' => true]);
+        ShippingAddress::where('user_id', Auth::id())->update(['is_default_shipping' => false]);
+        $address->update(['is_default_shipping' => true]);
 
         return redirect()
             ->route('shipping-address.index')

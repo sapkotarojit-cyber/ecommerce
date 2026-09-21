@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Product extends Model
 {
+
+protected $fillable = [
+        'category_id',
+        'dokan_id',
+        'title',
+        'description',
+    ];
+
     public function categories(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id');

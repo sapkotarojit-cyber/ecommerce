@@ -9,11 +9,18 @@ use Illuminate\Support\Str;
 class Category extends Model
 {
 
-public function products(): HasMany
+protected $fillable = [
+        'name',
+        'slug',
+        'is_active',
+    ];
+
+    public function products()
     {
-        // Change 'category_id' if your column in products table is named differently
-        return $this->hasMany(Product::class, 'category_id'); 
+        return $this->hasMany(Product::class, 'category_id');
     }
+
+
 
 
     protected static function boot()

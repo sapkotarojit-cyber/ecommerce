@@ -37,20 +37,19 @@
                             </div>
 
                             <div id="address-list-container" class="space-y-3 {{ $addresses->isEmpty() ? 'hidden' : '' }}">
-                                @foreach($addresses as $address)
-                                    <label class="relative flex items-start p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
-                                        <div class="flex items-center h-5">
-                                            <input type="radio" name="shipping_address_id" value="{{ $address->id }}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" {{ $loop->first ? 'checked' : '' }} required>
-                                        </div>
-                                        <div class="ml-3 text-sm">
-                                            <span class="font-semibold text-gray-900">{{ $address->title }}</span>
-                                            <span class="text-gray-500 font-normal">({{ $address->contact_no }})</span>
-                                            <p class="text-gray-600 mt-0.5">
-                                                {{ $address->full_address }}
-                                            </p>
-                                        </div>
-                                    </label>
-                                @endforeach
+                            <!-- Shipping Addresses Loop -->
+                                    @if(isset($addresses) && count($addresses) > 0)
+                                        @foreach($addresses as $address)
+                                            <label class="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50">
+                                                <input type="radio" name="shipping_address_id" value="{{ $address->id }}" {{ $address->is_default_shipping ? 'checked' : '' }} class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1">
+                                                <div>
+                                                    <p class="font-semibold text-gray-800">{{ $address->name }} <span class="text-xs font-normal text-gray-500">({{ $address->address_type }})</span></p>
+                                                    <p class="text-sm text-gray-600">{{ $address->address }}</p>
+                                                    <p class="text-sm text-gray-600">{{ $address->region }} | Phone: {{ $address->phone }}</p>
+                                                </div>
+                                            </label>
+                                        @endforeach
+                                    @endif
                             </div>
 
                             @error('shipping_address_id')
@@ -65,17 +64,17 @@
                             <h2 class="text-lg font-semibold text-gray-900">Payment Method</h2>
                         </div>
                         <div class="space-y-3">
-                            <label class="relative flex items-center p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
+                            <label class="relative flex items-center p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50">
                                 <input type="radio" name="payment_method" value="cod" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
                                 <span class="ml-3 text-sm font-semibold text-gray-900">Cash on Delivery (COD)</span>
                             </label>
                             
-                            <label class="relative flex items-center p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
+                            <label class="relative flex items-center p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50">
                                 <input type="radio" name="payment_method" value="esewa" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
                                 <span class="ml-3 text-sm font-semibold text-gray-900">Pay with eSewa (Online Payment)</span>
                             </label>
 
-                            <label class="relative flex items-center p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
+                            <label class="relative flex items-center p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50">
                                 <input type="radio" name="payment_method" value="bank" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
                                 <span class="ml-3 text-sm font-semibold text-gray-900">Direct Bank Transfer</span>
                             </label>
@@ -96,46 +95,43 @@
 
                         <div class="space-y-4 mb-6">
                             @php $itemIndex = 0; @endphp
-                            @foreach($vendorTotal as $dokanId =>$vendorGroup)
-                                <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                                    <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
-                                        Store: {{ $vendorGroup['dokan']->name ?? 'Default Store' }}
+                            @if(isset($vendorTotal) && count($vendorTotal) > 0)
+                                @foreach($vendorTotal as $dokanId =>$vendorGroup)
+                                    <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
+                                            Store: {{ $vendorGroup['dokan']->name ?? 'Default Store' }}
+                                        </div>
+                                        <div class="space-y-2 mb-3">
+                                          <!-- Order Summary Loops -->
+                                            @if(isset($vendorTotal) && count($vendorTotal) > 0)
+                                                @foreach($vendorTotal as $dokanId => $vendorGroup)
+                                                    <div class="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+                                                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-600 mb-2">
+                                                            Store: {{ $vendorGroup['dokan']->name ?? 'Default Store' }}
+                                                        </div>
+                                                        <div class="space-y-2 mb-3">
+                                                            @if(isset($vendorGroup['items']) && count($vendorGroup['items']) > 0)
+                                                                @foreach($vendorGroup['items'] as $item)
+                                                                    <!-- Item loop content -->
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                        <div class="flex justify-between text-xs text-gray-500 font-medium">
+                                            <span>Store Subtotal</span>
+                                            <span>${{ number_format($vendorGroup['subtotal'] ?? 0, 2) }}</span>
+                                        </div>
                                     </div>
-                                    <div class="space-y-2 mb-3">
-                                        @foreach($vendorGroup['items'] as $item)
-                                            @php
-                                                $varient =$item->varient ?? null;
-                                                $product =$item->product ?? null;
-                                                $price = $varient->price ?? $product->price ?? 0;
-                                                $discount =$varient->discount ?? 0;
-                                                $finalPrice = $price - ($price * $discount / 100);$quantity = $item->qty ?? $item->quantity ?? 1;
-                                                $varientId =$item->varient_id ?? ($varient ? $varient->id : null);
-                                            @endphp
-
-                                            <input type="hidden" name="items[{{ $itemIndex }}][varient_id]" value="{{ $varientId }}">
-                                            <input type="hidden" name="items[{{ $itemIndex }}][quantity]" value="{{ $quantity }}">
-
-                                            <div class="flex justify-between items-start text-sm">
-                                                <div>
-                                                    <span class="font-medium text-gray-900 block">{{ $product->name ?? 'Product' }}</span>
-                                                    <span class="text-xs text-gray-500">Qty: {{ $quantity }} × ${{ number_format($finalPrice, 2) }}</span>
-                                                </div>
-                                                <span class="font-semibold text-gray-900">${{ number_format($finalPrice * $quantity, 2) }}</span>
-                                            </div>
-                                            @php $itemIndex++; @endphp
-                                        @endforeach
-                                    </div>
-                                    <div class="flex justify-between text-xs text-gray-500 font-medium">
-                                        <span>Store Subtotal</span>
-                                        <span>${{ number_format($vendorGroup['subtotal'], 2) }}</span>
-                                    </div>
-                                </div>
-                            @endforeach
+                                @endforeach
+                            @endif
                         </div>
 
                         <div class="pt-4 border-t border-gray-200 flex justify-between items-center mb-6">
                             <span class="text-base font-bold text-gray-900">Total Amount</span>
-                            <span class="text-xl font-extrabold text-gray-900">${{ number_format($grandTotal, 2) }}</span>
+                            <span class="text-xl font-extrabold text-gray-900">${{ number_format($grandTotal ?? 0, 2) }}</span>
                         </div>
 
                         <button id="submit-order-btn" type="submit" class="w-full py-3.5 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider" {{ $addresses->isEmpty() ? 'disabled' : '' }}>
@@ -162,16 +158,24 @@
                 <form @submit.prevent="saveAddress()">
                     <div class="space-y-4 text-sm">
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Address Title</label>
-                            <input type="text" x-model="form.title" required placeholder="e.g. Home, Office" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Recipient's Name *</label>
+                            <input type="text" x-model="form.name" required placeholder="Input the real name" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Contact Number</label>
-                            <input type="text" x-model="form.contact_no" required placeholder="e.g. +977 9800000000" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Address Title / Type *</label>
+                            <input type="text" x-model="form.address_type" required placeholder="e.g. Home, Office" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Full Address</label>
-                            <textarea x-model="form.full_address" required rows="3" placeholder="Enter complete address detail..." class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Contact Number *</label>
+                            <input type="text" x-model="form.phone" required placeholder="e.g. +977 9800000000" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Region / City / District *</label>
+                            <input type="text" x-model="form.region" required placeholder="Enter region or city" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Full Address *</label>
+                            <textarea x-model="form.address" required rows="3" placeholder="Enter complete address detail..." class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500"></textarea>
                         </div>
                     </div>
 
@@ -190,18 +194,18 @@ function checkoutPage() {
     return {
         showAddressModal: false,
         form: {
-            title: '',
-            contact_no: '',
-            full_address: ''
+            name: '',
+            address_type: '',
+            phone: '',
+            region: '',
+            address: ''
         },
         openModal() {
             this.showAddressModal = true;
         },
         closeModal() {
             this.showAddressModal = false;
-            this.form.title = '';
-            this.form.contact_no = '';
-            this.form.full_address = '';
+            this.form = { name: '', address_type: '', phone: '', region: '', address: '' };
         },
         saveAddress() {
             fetch("{{ route('shipping-address.quick-store') }}", {
@@ -219,14 +223,12 @@ function checkoutPage() {
                     const address = data.address;
                     
                     const newAddressHtml = `
-                        <label class="relative flex items-start p-4 rounded-xl border border-gray-200 cursor-pointer hover:border-indigo-500 transition-all bg-gray-50/50 has-[:checked]:bg-indigo-50/30 has-[:checked]:border-indigo-600">
-                            <div class="flex items-center h-5">
-                                <input type="radio" name="shipping_address_id" value="${address.id}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked required>
-                            </div>
-                            <div class="ml-3 text-sm">
-                                <span class="font-semibold text-gray-900">${address.title}</span>
-                                <span class="text-gray-500 font-normal">(${address.contact_no})</span>
-                                <p class="text-gray-600 mt-0.5">${address.full_address}</p>
+                        <label class="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50">
+                            <input type="radio" name="shipping_address_id" value="${address.id}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1" checked required>
+                            <div>
+                                <p class="font-semibold text-gray-800">${address.name} <span class="text-xs font-normal text-gray-500">(${address.address_type})</span></p>
+                                <p class="text-sm text-gray-600">${address.address}</p>
+                                <p class="text-sm text-gray-600">${address.region} | Phone: ${address.phone}</p>
                             </div>
                         </label>
                     `;
@@ -239,6 +241,8 @@ function checkoutPage() {
                     document.getElementById('submit-order-btn').removeAttribute('disabled');
 
                     this.closeModal();
+                } else {
+                    alert(data.message || 'Error saving address.');
                 }
             })
             .catch(error => console.error("Error adding address:", error));

@@ -1,4 +1,3 @@
-<!-- resources/views/frontend/shipping-address/index.blade.php -->
 @extends('frontend.frontend-layout')
 
 @section('title', 'Shipping Addresses - Empireinnovation')
@@ -9,9 +8,9 @@
         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-[#1a2a6c]">Shipping Addresses</h1>
-                <p class="text-gray-500 text-sm">Manage your shipping addresses</p>
+                <p class="text-gray-500 text-sm">Manage your delivery locations</p>
             </div>
-            <a href="{{ route('shipping-address.create') }}" class="inline-flex items-center px-4 py-2 bg-[#c9a84c] text-[#1a2a6c] font-semibold rounded-lg hover:bg-[#dbb95c] transition-all">
+            <a href="{{ route('shipping-address.create') }}" class="inline-flex items-center px-4 py-2.5 bg-[#f97316] text-white font-semibold rounded-lg hover:bg-[#ea580c] transition-all shadow-sm">
                 <i class="fas fa-plus mr-2"></i> Add New Address
             </a>
         </div>
@@ -34,30 +33,34 @@
                     <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 hover:shadow-md transition-all">
                         <div class="flex flex-col sm:flex-row justify-between items-start gap-3">
                             <div class="flex-1">
-                                <div class="flex items-center space-x-3">
-                                    <h3 class="font-semibold text-[#1a2a6c]">{{ $address->title }}</h3>
-                                    @if($address->is_default)
-                                        <span class="bg-[#c9a84c] text-[#1a2a6c] text-xs font-bold px-3 py-1 rounded-full">Default</span>
+                                <div class="flex items-center space-x-3 mb-1">
+                                    <h3 class="font-bold text-[#1a2a6c] text-lg">{{ $address->name }}</h3>
+                                    <span class="bg-gray-100 text-gray-700 text-xs px-2.5 py-0.5 rounded font-medium">{{ $address->address_type }}</span>
+                                    @if($address->is_default_shipping)
+                                        <span class="bg-[#f97316] text-white text-xs font-bold px-2.5 py-0.5 rounded-full">Default Shipping</span>
                                     @endif
                                 </div>
-                                <p class="text-gray-600 text-sm mt-1">{{ $address->full_address }}</p>
-                                <p class="text-gray-500 text-sm mt-1"><i class="fas fa-phone mr-2"></i> {{ $address->contact_no }}</p>
+                                <p class="text-gray-600 text-sm"><i class="fas fa-map-marker-alt text-gray-400 mr-2"></i> {{ $address->address }} ({{ $address->region }})</p>
+                                @if($address->landmark)
+                                    <p class="text-gray-500 text-xs mt-1 ml-5">Landmark: {{ $address->landmark }}</p>
+                                @endif
+                                <p class="text-gray-500 text-sm mt-2"><i class="fas fa-phone text-gray-400 mr-2"></i> {{ $address->phone }}</p>
                             </div>
-                            <div class="flex items-center space-x-2 flex-shrink-0">
-                                @if(!$address->is_default)
+                            <div class="flex items-center space-x-3 flex-shrink-0 pt-2 sm:pt-0">
+                                @if(!$address->is_default_shipping)
                                     <form action="{{ route('shipping-address.set-default', $address) }}" method="POST">
                                         @csrf
                                         @method('PATCH')
-                                        <button type="submit" class="text-sm text-[#c9a84c] hover:text-[#b8963a] font-medium">Set Default</button>
+                                        <button type="submit" class="text-xs text-[#f97316] hover:underline font-medium">Set Default</button>
                                     </form>
                                 @endif
-                                <a href="{{ route('shipping-address.edit', $address) }}" class="text-sm text-blue-600 hover:text-blue-800">
+                                <a href="{{ route('shipping-address.edit', $address) }}" class="text-blue-600 hover:text-blue-800 p-1" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <form action="{{ route('shipping-address.destroy', $address) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this address?')">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="text-sm text-red-600 hover:text-red-800">
+                                    <button type="submit" class="text-red-600 hover:text-red-800 p-1" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
@@ -74,8 +77,8 @@
             <div class="bg-white rounded-xl shadow-sm p-12 text-center">
                 <i class="fas fa-map-pin text-5xl text-gray-300 mb-4"></i>
                 <h3 class="text-lg font-semibold text-[#1a2a6c]">No Addresses Yet</h3>
-                <p class="text-gray-500 text-sm mt-1">Add your first shipping address to start ordering</p>
-                <a href="{{ route('shipping-address.create') }}" class="inline-flex items-center px-4 py-2 bg-[#c9a84c] text-[#1a2a6c] font-semibold rounded-lg hover:bg-[#dbb95c] transition-all mt-4">
+                <p class="text-gray-500 text-sm mt-1">Add your shipping address to proceed smoothly with orders.</p>
+                <a href="{{ route('shipping-address.create') }}" class="inline-flex items-center px-4 py-2 bg-[#f97316] text-white font-semibold rounded-lg hover:bg-[#ea580c] transition-all mt-4">
                     <i class="fas fa-plus mr-2"></i> Add Address
                 </a>
             </div>

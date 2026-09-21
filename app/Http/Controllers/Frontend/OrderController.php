@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Frontend;
 
+use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ShippingAddress;
+use App\Models\ProductVarient; 
 use Illuminate\Http\Request;
-use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -79,7 +80,7 @@ class OrderController extends Controller
     }
 
     /**
-     * Store order placement and handle payment routing.
+     * Store order placement and handle payment routing (COD, eSewa, Bank Transfer).
      */
     public function store(Request $request)
     {
@@ -90,7 +91,7 @@ class OrderController extends Controller
 
         $paymentMethod = strtolower(trim($request->payment_method));
 
-        // Explicitly check for eSewa gateway
+        // 1. eSewa Gateway Routing
         $esewaMethods = ['esewa', 'online', 'card'];
         if (in_array($paymentMethod, $esewaMethods)) {
             DB::beginTransaction();
@@ -119,7 +120,6 @@ class OrderController extends Controller
 
                     $grandTotalAmount += $totalAmount;
 
-                    // Create order upfront as pending payment
                     $order = Order::create([
                         'user_id' => Auth::id(),
                         'dokan_id' => $dokanId ?: null,
@@ -140,7 +140,7 @@ class OrderController extends Controller
                             'order_id' => $order->id,
                             'product_id' => $item->product_id,
                             'varient_id' => $item->varient_id,         
-                            'qty' => $item->qty,
+                            'qty' => $item->qty,          
                             'amount' => $finalPrice * $item->qty,      
                         ]);
                     }
@@ -152,7 +152,6 @@ class OrderController extends Controller
                 ]);
 
                 Cart::where('user_id', Auth::id())->delete();
-
                 DB::commit();
 
                 return $this->initiateEsewaPayment($masterTracking, $grandTotalAmount);
@@ -163,7 +162,7 @@ class OrderController extends Controller
             }
         }
 
-        // Explicitly check for Bank Transfer / Net Banking gateway
+        // 2. Bank Transfer / Net Banking Routing
         $bankMethods = ['bank', 'net_banking', 'bank_transfer', 'direct_bank'];
         if (in_array($paymentMethod, $bankMethods)) {
             DB::beginTransaction();
@@ -208,11 +207,12 @@ class OrderController extends Controller
                         $discount = $item->varient->discount ?? 0;
                         $finalPrice = $price - ($price * $discount / 100);
 
+                        // Fixed: Added 'qty' and 'amount' to resolve the 1364 Field 'qty' doesn't have a default value error
                         OrderItem::create([
                             'order_id' => $order->id,
                             'product_id' => $item->product_id,
                             'varient_id' => $item->varient_id,         
-                            'qty' => $item->qty,
+                            'qty' => $item->qty,          
                             'amount' => $finalPrice * $item->qty,      
                         ]);
                     }
@@ -225,10 +225,8 @@ class OrderController extends Controller
                 ]);
 
                 Cart::where('user_id', Auth::id())->delete();
-
                 DB::commit();
 
-                // Redirect user to the custom bank payment page showing QR and account info
                 return redirect()->route('bank.pay');
 
             } catch (\Exception $e) {
@@ -237,7 +235,7 @@ class OrderController extends Controller
             }
         }
 
-        // Cash on Delivery (COD) / Direct Order Creation Block
+        // 3. Cash on Delivery (COD) / Direct Order Creation Block
         DB::beginTransaction();
 
         try {
@@ -248,6 +246,12 @@ class OrderController extends Controller
             if ($cartItems->isEmpty()) {
                 DB::rollBack();
                 return redirect()->route('cart.index')->with('error', 'Your cart is empty.');
+            }
+
+            foreach ($cartItems as $item) {
+                if ($item->varient && $item->varient->qty < $item->qty) {
+                    throw new \Exception("Insufficient stock for '{$item->product->name}'. Only {$item->varient->qty} left.");
+                }
             }
 
             $groupedByVendor = $cartItems->groupBy('dokan_id');
@@ -281,14 +285,17 @@ class OrderController extends Controller
                         'order_id' => $order->id,
                         'product_id' => $item->product_id,
                         'varient_id' => $item->varient_id,         
-                        'qty' => $item->qty,
+                        'qty' => $item->qty,          
                         'amount' => $finalPrice * $item->qty,      
                     ]);
+
+                    if ($item->varient) {
+                        $item->varient->decrement('qty', $item->qty);
+                    }
                 }
             }
 
             Cart::where('user_id', Auth::id())->delete();
-
             DB::commit();
 
             return redirect()->route('orders.index')->with('success', 'Order placed successfully!');
@@ -298,9 +305,6 @@ class OrderController extends Controller
         }
     }
 
-    /**
-     * Show the custom bank transfer page containing QR code and bank account options.
-     */
     public function bankPaymentPage()
     {
         $pendingOrderData = session()->get('pending_gateway_order');
@@ -342,21 +346,6 @@ class OrderController extends Controller
         return view('frontend.payments.esewa-redirect', compact('data'));
     }
 
-    protected function initiateBankPayment($masterTracking, $totalAmount)
-    {
-        $transactionUuid = $masterTracking . '-' . time();
-        
-        $data = [
-            'amount' => $totalAmount,
-            'transaction_uuid' => $transactionUuid,
-            'success_url' => route('bank.success'),
-            'failure_url' => route('bank.failure'),
-            'gateway_url' => config('services.bank.url', 'https://your-bank-gateway-endpoint.com/pay') 
-        ];
-
-        return view('frontend.payments.bank-redirect', compact('data'));
-    }
-
     public function esewaSuccess(Request $request)
     {
         $encodedData = $request->input('data');
@@ -375,6 +364,15 @@ class OrderController extends Controller
             }
 
             $masterTracking = $pendingOrderData['master_tracking'];
+            $orders = Order::with('order_items.varient')->where('tracking_number', 'like', $masterTracking . '%')->get();
+
+            foreach($orders as $order) {
+                foreach($order->order_items as $item) {
+                    if ($item->varient) {
+                        $item->varient->decrement('qty', $item->qty);
+                    }
+                }
+            }
 
             $updatedCount = Order::where('tracking_number', 'like', $masterTracking . '%')
                 ->update([
@@ -408,11 +406,20 @@ class OrderController extends Controller
 
         $masterTracking = $pendingOrderData['master_tracking'];
 
-        // Handle file upload
         if ($request->hasFile('payment_receipt')) {
             $file = $request->file('payment_receipt');
             $filename = 'receipt_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
             $receiptPath = $file->storeAs('payment_receipts', $filename, 'public');
+        }
+
+        $orders = Order::with('order_items.varient')->where('tracking_number', 'like', $masterTracking . '%')->get();
+
+        foreach($orders as $order) {
+            foreach($order->order_items as $item) {
+                if ($item->varient) {
+                    $item->varient->decrement('qty', $item->qty);
+                }
+            }
         }
 
         $updatedCount = Order::where('tracking_number', 'like', $masterTracking . '%')
