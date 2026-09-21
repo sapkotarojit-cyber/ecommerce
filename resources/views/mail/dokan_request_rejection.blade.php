@@ -1,13 +1,18 @@
 <!DOCTYPE html>
-
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vendor Application Rejected - Empireinnovation</title>
 </head>
 
-<body style="margin:0; padding:0; background:#f4f6f9; font-family:Arial, Helvetica, sans-serif;">
+<body style="
+    margin:0;
+    padding:0;
+    background:#f4f6f9;
+    font-family:Arial, Helvetica, sans-serif;
+">
 
 <div style="
     max-width:600px;
@@ -18,75 +23,98 @@
     box-shadow:0 2px 10px rgba(0,0,0,0.08);
 ">
 
-    <!-- Header -->
+    <!-- HEADER -->
     <div style="
-        background:#1a2a6c;
-        padding:30px;
+        background:#1c253f;
+        padding:25px 20px 30px;
         text-align:center;
-        color:white;
+        color:#1c253f;
     ">
-        <h1 style="
-            margin:0;
-            font-size:24px;
-        ">
-            🏪 Empireinnovation
-        </h1>
 
+        <!-- LOGO WHITE BOX -->
+        <div style="
+            background:#1c253f;
+            width:120px;
+            height:120px;
+            margin:0 auto;
+            border-radius:10px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        ">
+
+            <img
+                src="{{ $message->embed(public_path('images/logo5.png')) }}"
+                alt="Empire Innovation"
+                width="100"
+                height="100"
+                style="
+                    width:100px;
+                    height:100px;
+                    object-fit:contain;
+                    display:block;
+                    margin:0 auto;
+                "
+            >
+
+        </div>
+
+        <!-- MARKETPLACE TEXT -->
         <p style="
-            margin:8px 0 0;
+            margin:12px 0 0;
             color:#c9a84c;
-            font-size:14px;
-            font-weight:600;
-        ">
-            PVT. LTD
-        </p>
-
-        <p style="
-            margin:5px 0 0;
-            color:#ffffff;
-            font-size:13px;
-            opacity:0.9;
+            font-size:15px;
+            font-weight:bold;
         ">
             Multi-Vendor Marketplace
         </p>
+
     </div>
 
-    <!-- Content -->
+
+    <!-- CONTENT -->
     <div style="padding:30px;">
 
         <h2 style="
             color:#1a2a6c;
             margin-top:0;
-            font-size:21px;
+            font-size:22px;
         ">
             Vendor Application Update
         </h2>
 
-        <p style="
-            color:#555;
-            line-height:1.6;
-        ">
-            Dear <strong>{{ $dokan->company_name }}</strong>,
-        </p>
 
         <p style="
             color:#555;
             line-height:1.6;
+            margin:10px 0;
+        ">
+            Dear <strong>{{ $dokan->company_name }}</strong>,
+        </p>
+
+
+        <p style="
+            color:#555;
+            line-height:1.6;
+            margin:10px 0;
         ">
             Thank you for your interest in becoming a vendor with
             <strong>Empireinnovation PVT. LTD</strong>.
         </p>
 
+
         <p style="
             color:#555;
             line-height:1.6;
+            margin:10px 0;
         ">
             After carefully reviewing your vendor application, we regret
             to inform you that your application has not been approved at
             this time.
         </p>
 
-        <!-- Status Box -->
+
+        <!-- STATUS BOX -->
         <div style="
             background:#fff4f4;
             border-left:4px solid #dc3545;
@@ -109,7 +137,8 @@
 
         </div>
 
-        <!-- Rejection Reason -->
+
+        <!-- REJECTION REASON -->
         <div style="
             background:#f8f9fa;
             padding:20px;
@@ -135,7 +164,8 @@
 
         </div>
 
-        <!-- Application Details -->
+
+        <!-- APPLICATION DETAILS -->
         <div style="
             background:#f8f9fa;
             padding:20px;
@@ -151,27 +181,44 @@
                 🏢 Application Details
             </h3>
 
-            <p style="color:#555; margin:10px 0;">
+
+            <p style="
+                color:#555;
+                margin:10px 0;
+            ">
                 <strong>Company:</strong>
                 {{ $dokan->company_name }}
             </p>
 
-            <p style="color:#555; margin:10px 0;">
+
+            <p style="
+                color:#555;
+                margin:10px 0;
+            ">
                 <strong>Email:</strong>
                 {{ $dokan->email }}
             </p>
 
-            <p style="color:#555; margin:10px 0;">
+
+            <p style="
+                color:#555;
+                margin:10px 0;
+            ">
                 <strong>Registration No:</strong>
                 {{ $dokan->reg_no }}
             </p>
 
-            <p style="color:#555; margin:10px 0;">
+
+            <p style="
+                color:#555;
+                margin:10px 0;
+            ">
                 <strong>Contact Number:</strong>
                 {{ $dokan->contact_number }}
             </p>
 
         </div>
+
 
         <p style="
             color:#555;
@@ -183,6 +230,7 @@
             contact our support team.
         </p>
 
+
         <p style="
             color:#555;
             line-height:1.6;
@@ -190,6 +238,7 @@
             We appreciate the time and effort you took to apply and thank
             you for your interest in joining our marketplace.
         </p>
+
 
         <p style="
             color:#555;
@@ -204,7 +253,8 @@
 
     </div>
 
-    <!-- Footer -->
+
+    <!-- FOOTER -->
     <div style="
         background:#f8f9fa;
         padding:20px;
@@ -223,6 +273,7 @@
             </span>
         </p>
 
+
         <p style="
             margin:8px 0 0;
             color:#888;
@@ -230,6 +281,7 @@
         ">
             Multi-Vendor Marketplace
         </p>
+
 
         <p style="
             margin:8px 0 0;

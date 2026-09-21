@@ -1,17 +1,13 @@
 <!-- resources/views/components/frontend-footer.blade.php -->
-<footer class="bg-[#0f1a3a] text-white/90">
+<footer class="bg-[#1c253f] text-white/90">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <!-- Brand -->
             <div class="col-span-1 md:col-span-2 lg:col-span-1">
-                <div class="flex items-center space-x-2 mb-4">
-                    <div class="w-10 h-10 bg-[#c9a84c] rounded-lg flex items-center justify-center">
-                        <span class="text-[#0f1a3a] font-extrabold text-xl">E</span>
-                    </div>
-                    <div>
-                        <span class="text-white font-bold text-lg tracking-tight">Empireinnovation</span>
-                        <span class="text-[#c9a84c] font-semibold text-sm block -mt-1">PVT. LTD</span>
-                    </div>
+                <div class="mb-4">
+                    <a href="{{ route('home') }}" class="inline-block h-12">
+                        <img src="{{ asset('images/logo5.png') }}" alt="Empire Innovation" class="h-full w-auto object-contain">
+                    </a>
                 </div>
                 <p class="text-sm text-white/70 leading-relaxed">
                     Empowering vendors and customers with a seamless multi-vendor ecommerce experience.
@@ -24,10 +20,7 @@
                         <i class="fab fa-instagram text-lg"></i>
                     </a>
                     <a href="#" class="text-white/60 hover:text-[#c9a84c] transition-colors">
-                        <i class="fab fa-twitter text-lg"></i>
-                    </a>
-                    <a href="#" class="text-white/60 hover:text-[#c9a84c] transition-colors">
-                        <i class="fab fa-youtube text-lg"></i>
+                        <i class="fab fa-whatsapp text-lg"></i>
                     </a>
                 </div>
             </div>

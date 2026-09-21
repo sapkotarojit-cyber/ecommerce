@@ -1,4 +1,4 @@
-<footer class="bg-[#0f1a3a] text-white/90 mt-auto">
+<footer class="bg-[#1c253f] text-white/90 mt-auto">
     <!-- Seller CTA Banner -->
     <div class="border-b border-white/10 bg-gradient-to-r from-slate-900/40 to-amber-900/20">
         <div class="container mx-auto px-4 py-8">
@@ -7,7 +7,6 @@
                     <h4 class="text-white font-semibold text-lg">Want to sell medical & surgical supplies on Empire Innovation?</h4>
                     <p class="text-sm text-white/70">Join 100+ verified medical sellers and grow your business today</p>
                 </div>
-                
             </div>
         </div>
     </div>
@@ -17,14 +16,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <!-- Brand Overview -->
             <div class="col-span-1 md:col-span-2 lg:col-span-1">
-                <div class="flex items-center space-x-2 mb-4">
-                    <div class="w-10 h-10 bg-[#c9a84c] rounded-lg flex items-center justify-center">
-                        <span class="text-[#0f1a3a] font-extrabold text-xl">E</span>
-                    </div>
-                    <div>
-                        <span class="text-white font-bold text-lg tracking-tight block">Empireinnovation</span>
-                        <span class="text-[#c9a84c] font-semibold text-xs tracking-widest block -mt-1">PVT. LTD</span>
-                    </div>
+                <!-- Replaced text logo with image logo -->
+                <div class="mb-4">
+                    <a href="{{ route('home') }}" class="inline-block h-12">
+                        <img src="{{ asset('images/logo5.png') }}" alt="Empire Innovation" class="h-full w-auto ">
+                    </a>
                 </div>
                 <p class="text-sm text-white/70 leading-relaxed mb-4">
                     Empowering surgical suppliers, healthcare institutions, and sellers with a seamless multi-seller ecommerce experience.
@@ -38,7 +34,6 @@
                     <li><a href="{{ route('home') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">Home</a></li>
                     <li><a href="{{ route('products') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">Products</a></li>
                     <li><a href="{{ route('about') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">About Us</a></li>
-                    
                 </ul>
             </div>
 
