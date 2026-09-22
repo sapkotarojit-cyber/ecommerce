@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'Empireinnovation - Multi-Vendor Marketplace')
+<title>Home - EmpireInnovation</title>
 
 @section('content')
 <!-- Hero Section -->

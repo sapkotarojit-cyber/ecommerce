@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'About Us - Empireinnovation PVT. LTD')
+<title>About Us - EmpireInnovation</title>
 
 @section('content')
 <!-- Hero Header -->

@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'Order Details - ' . ($order->tracking_number ?? $order->id))
+<title>Order Details - EmpireInnovation</title>
 
 @section('content')
 <div class="py-8 px-4 sm:px-6 lg:px-8">

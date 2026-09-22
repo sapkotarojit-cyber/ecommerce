@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', $product->title . ' - Empireinnovation')
+<title>Products - EmpireInnovation</title>
 
 @section('content')
 <section class="py-8 md:py-12" x-data="cartComponent()">

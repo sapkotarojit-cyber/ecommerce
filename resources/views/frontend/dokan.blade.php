@@ -2,6 +2,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'Become a Vendor - Empireinnovation')
+<title>Become a Vendor - EmpireInnovation</title>
 
 @section('content')
 <section class="py-8 md:py-12">

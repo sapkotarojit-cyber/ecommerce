@@ -32,31 +32,26 @@
         ">
 
             <!-- LOGO WHITE BOX -->
-            <div style="
+             <div style="
                 background:#1c253f;
-                width:120px;
-                height:120px;
-                margin:0 auto;
-                border-radius:10px;
                 display:flex;
+                width:180px;
+                height:140px;
+                margin:0 auto;
                 align-items:center;
                 justify-content:center;
             ">
-
                 <img
                     src="{{ $message->embed(public_path('images/logo5.png')) }}"
                     alt="Empire Innovation"
-                    width="100"
-                    height="100"
+                    width="160"
                     style="
-                        width:100px;
-                        height:100px;
-                        object-fit:contain;
+                        width:160px;
+                        height:auto;
                         display:block;
-                        margin:0 auto;
+                        object-fit:contain;
                     "
                 >
-
             </div>
 
             <!-- MARKETPLACE TEXT -->

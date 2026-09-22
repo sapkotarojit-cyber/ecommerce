@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'My Orders - Empireinnovation')
+<title>My Orders - EmpireInnovation</title>
 
 @section('content')
 <div class="container mx-auto px-4 py-8">

@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'Shopping Cart - Empireinnovation')
+ <title>Cart - EmpireInnovation</title>
 
 @section('content')
 <section class="py-8 md:py-12 bg-gray-50 min-h-screen">

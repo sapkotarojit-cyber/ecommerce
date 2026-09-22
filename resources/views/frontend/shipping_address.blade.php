@@ -1,6 +1,7 @@
 @extends('components.frontend-layout')
 
 @section('title', 'Edit Shipping Address - Empireinnovation PVT.LTD')
+<title>Edit Shipping Address - EmpireInnovation</title>
 
 @section('content')
 <div class="container-custom py-8 max-w-2xl">

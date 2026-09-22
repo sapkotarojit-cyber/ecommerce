@@ -12,7 +12,7 @@
     <link rel="shortcut icon" href="{{ asset('logo1.png') }}">
 
     <meta name="description" content="Shop medical and surgical supplies from thousands of trusted sellers on Empire Innovation">
-    <title>Empire Innovation - Multi-Seller Marketplace</title>      
+         
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'Redirecting to eSewa - Empireinnovation')
+<title>Esewa - EmpireInnovation</title>
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 py-16 text-center">

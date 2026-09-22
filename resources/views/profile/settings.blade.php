@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
-@section('title', 'Add Shipping Address - Empireinnovation')
+@section('title', 'Account Settings - Empireinnovation')
+<title>Account Settings - EmpireInnovation</title>
 
 @section('content')
 

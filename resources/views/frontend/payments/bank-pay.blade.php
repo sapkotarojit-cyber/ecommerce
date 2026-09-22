@@ -1,6 +1,7 @@
 @extends('frontend.frontend-layout')
 
 @section('title', 'Direct Bank Transfer - Empireinnovation')
+<title>BankPay - EmpireInnovation</title>
 
 @section('content')
 <div class="max-w-4xl mx-auto px-4 py-12">

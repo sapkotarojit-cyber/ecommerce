@@ -1,2 +1,1 @@
-use my logo in email 
-add product from vendor account 
+check admin panel and job is done
