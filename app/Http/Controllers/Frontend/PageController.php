@@ -146,49 +146,145 @@ class PageController extends Controller
     }
 
     public function dokan_registration_submit(Request $request)
-    {
-        // Validate registration form
-        $validated = $request->validate([
-            'company_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:dokans,email',
-            'reg_no' => 'required|string|max:255|unique:dokans,reg_no',
-            'contact_number' => 'required|string|max:20',
-            'logo' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
-            'terms' => 'required|accepted',
-        ]);
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Check Existing Vendor Application
+    |--------------------------------------------------------------------------
+    */
 
-        try {
+    $email = strtolower(trim($request->email));
+    $regNo = trim($request->reg_no);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Handle Logo Upload
-            |--------------------------------------------------------------------------
-            */
+    $emailVendor = Dokan::where('email', $email)->first();
+    $regNoVendor = Dokan::where('reg_no', $regNo)->first();
 
-            $file = $request->file('logo');
+    /*
+    |--------------------------------------------------------------------------
+    | Prevent conflicts with different vendor records
+    |--------------------------------------------------------------------------
+    */
 
-            $logoPath = null;
+    if (
+        $emailVendor &&
+        $regNoVendor &&
+        $emailVendor->id !== $regNoVendor->id
+    ) {
+        return redirect()
+            ->back()
+            ->withInput()
+            ->withErrors([
+                'email' => 'This email and registration number belong to different vendor applications.',
+                'reg_no' => 'This registration number is already associated with another vendor.',
+            ]);
+    }
 
-            if ($file) {
+    /*
+    |--------------------------------------------------------------------------
+    | Find existing vendor
+    |--------------------------------------------------------------------------
+    */
 
-                $fileName = time() . '_' .
-                    preg_replace(
-                        '/[^a-zA-Z0-9.]/',
-                        '',
-                        $file->getClientOriginalName()
-                    );
+    $existingDokan = $emailVendor ?? $regNoVendor;
 
-                $file->move(
-                    public_path('storage/vendor-logos'),
-                    $fileName
+    /*
+    |--------------------------------------------------------------------------
+    | Pending / Approved vendors cannot register again
+    |--------------------------------------------------------------------------
+    */
+
+    if ($existingDokan) {
+
+        if ($existingDokan->status !== Dokan::STATUS_REJECTED) {
+
+            return redirect()
+                ->back()
+                ->withInput()
+                ->withErrors([
+                    'email' => 'This email is already registered as a vendor.',
+                    'reg_no' => 'This registration number is already registered.',
+                ]);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validate Registration
+    |--------------------------------------------------------------------------
+    */
+
+    $validated = $request->validate([
+        'company_name' => 'required|string|max:255',
+        'email' => 'required|email',
+        'reg_no' => 'required|string|max:255',
+        'contact_number' => 'required|string|max:20',
+        'logo' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
+        'terms' => 'required|accepted',
+    ]);
+
+    try {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Handle Logo Upload
+        |--------------------------------------------------------------------------
+        */
+
+        $file = $request->file('logo');
+
+        $logoPath = null;
+
+        if ($file) {
+
+            $fileName = time() . '_' .
+                preg_replace(
+                    '/[^a-zA-Z0-9.]/',
+                    '',
+                    $file->getClientOriginalName()
                 );
 
-                $logoPath = 'vendor-logos/' . $fileName;
+            $file->move(
+                public_path('storage/vendor-logos'),
+                $fileName
+            );
+
+            $logoPath = 'vendor-logos/' . $fileName;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Re-apply using existing rejected application
+        |--------------------------------------------------------------------------
+        */
+
+        if ($existingDokan) {
+
+            $existingDokan->user_id = Auth::id();
+            $existingDokan->company_name = $validated['company_name'];
+            $existingDokan->email = $email;
+            $existingDokan->reg_no = $regNo;
+            $existingDokan->contact_number = $validated['contact_number'];
+
+            if ($logoPath) {
+                $existingDokan->logo = $logoPath;
             }
+
+            // Reset rejected application
+            $existingDokan->status = Dokan::STATUS_PENDING;
+            $existingDokan->rejection_comment = null;
+
+            // Make sure old password cannot be used
+            $existingDokan->password = null;
+
+            $existingDokan->save();
+
+            $dokan = $existingDokan;
+
+        } else {
 
             /*
             |--------------------------------------------------------------------------
-            | Create Vendor Application
+            | Create completely new vendor application
             |--------------------------------------------------------------------------
             */
 
@@ -196,37 +292,54 @@ class PageController extends Controller
 
             $dokan->user_id = Auth::id();
             $dokan->company_name = $validated['company_name'];
-            $dokan->email = $validated['email'];
-            $dokan->reg_no = $validated['reg_no'];
+            $dokan->email = $email;
+            $dokan->reg_no = $regNo;
             $dokan->contact_number = $validated['contact_number'];
             $dokan->logo = $logoPath;
             $dokan->status = Dokan::STATUS_PENDING;
 
             $dokan->save();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Send Application Notification to Admin
-            |--------------------------------------------------------------------------
-            */
-
-            Mail::to([
-                'empireinnovation2025@gmail.com',
-                $dokan->email,
-            ])->send(new DokanApplicationReceived($dokan));
-
-            return redirect()
-                ->back()
-                ->with('success', 'Vendor registration submitted successfully.');
-        } catch (\Throwable $exception) {
-            Log::error('Vendor registration failed.', [
-                'exception' => $exception,
-            ]);
-
-            return redirect()
-                ->back()
-                ->withInput()
-                ->with('error', 'Unable to submit vendor registration.');
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send Application Notification
+        |--------------------------------------------------------------------------
+        */
+
+        Mail::to([
+            'empireinnovation2025@gmail.com',
+            $dokan->email,
+        ])->send(
+            new DokanApplicationReceived($dokan)
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Success
+        |--------------------------------------------------------------------------
+        */
+
+        return redirect()
+            ->back()
+            ->with(
+                'success',
+                'Vendor registration submitted successfully.'
+            );
+
+    } catch (\Throwable $exception) {
+
+        Log::error('Vendor registration failed.', [
+            'exception' => $exception,
+        ]);
+
+        return redirect()
+            ->back()
+            ->withInput()
+            ->with(
+                'error',
+                'Unable to submit vendor registration.'
+            );
     }
 }
+    }

@@ -32,12 +32,25 @@ class OrderForm
                     ->required()
                     ->exists('dokans', 'id'),
 
-                Select::make('shipping_address_id')
-                    ->relationship('shippingAddress', 'full_address')
-                    ->searchable()
-                    ->preload()
-                    ->required()
-                    ->exists('shipping_addresses', 'id'),
+                TextInput::make('shipping_address_display')
+                    ->label('Shipping Address')
+                    ->formatStateUsing(function ($state, $record) {
+                        $shipping = $record->shippingAddress;
+
+                        if (! $shipping) {
+                            return 'No Address';
+                        }
+
+                        return implode(', ', array_filter([
+                            $shipping->name,
+                            $shipping->phone,
+                            $shipping->address,
+                            $shipping->landmark,
+                            $shipping->region,
+                        ]));
+                    })
+                    ->disabled()
+                    ->dehydrated(false),
 
                 TextInput::make('total_amount')
                     ->numeric()

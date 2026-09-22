@@ -16,31 +16,52 @@ class ShippingAddressesTable
         return $table
             ->columns([
                 TextColumn::make('user_id')
+                    ->label('User ID')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('title')
+
+                TextColumn::make('name')
+                    ->label('Name')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('phone')
+                    ->label('Contact No')
                     ->searchable(),
-                TextColumn::make('contact_no')
-                    ->searchable(),
+
                 TextColumn::make('full_address')
-                    ->searchable(),
-                IconColumn::make('is_default')
+                    ->label('Full Address')
+                    ->searchable()
+                    ->wrap()
+                    ->limit(60),
+
+                IconColumn::make('is_default_shipping')
+                    ->label('Default Shipping')
                     ->boolean(),
+
+                IconColumn::make('is_default_billing')
+                    ->label('Default Billing')
+                    ->boolean(),
+
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+
             ->filters([
                 //
             ])
+
             ->recordActions([
                 EditAction::make(),
             ])
+
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

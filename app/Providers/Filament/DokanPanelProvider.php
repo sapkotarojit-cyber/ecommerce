@@ -65,6 +65,8 @@ class DokanPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Dokan/Widgets'), for: 'App\Filament\Dokan\Widgets')
             ->widgets([
                 VendorStatsOverview::class,
+                RecentOrders::class,
+                TopProductsWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

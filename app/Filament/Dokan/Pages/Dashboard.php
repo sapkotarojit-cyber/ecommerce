@@ -3,6 +3,8 @@
 namespace App\Filament\Dokan\Pages;
 
 use App\Filament\Dokan\Widgets\RecentOrders;
+use App\Filament\Dokan\Widgets\StatsOverview;
+use App\Filament\Dokan\Widgets\TopProductsWidget;
 use App\Filament\Dokan\Widgets\VendorStatsOverview;
 use Filament\Pages\Page;
 
@@ -21,13 +23,9 @@ class Dashboard extends Page
     {
         return [
             VendorStatsOverview::class,
-        ];
-    }
-
-    protected function getFooterWidgets(): array
-    {
-        return [
             RecentOrders::class,
         ];
     }
+
+   
 }

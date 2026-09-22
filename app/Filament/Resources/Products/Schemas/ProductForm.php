@@ -18,21 +18,21 @@ class ProductForm
     {
         $categorySelect = Select::make('category_id')
             ->label('Category')
-            ->relationship('categories', 'name')
+            ->relationship('category', 'name')
             ->searchable()
             ->preload()
             ->required()
-            // 👈 Enabled for everyone (both Admins and Dokan vendors)
             ->createOptionForm([
-                TextInput::make('name')
-                    ->label('Category Name')
-                    ->required()
-                    ->unique('categories', 'name'),
-                TextInput::make('slug')
-                    ->label('Category Slug')
-                    ->required()
-                    ->unique('categories', 'slug'),
-            ]);
+        TextInput::make('name')
+            ->label('Category Name')
+            ->required()
+            ->unique('categories', 'name'),
+
+        TextInput::make('slug')
+            ->label('Category Slug')
+            ->required()
+            ->unique('categories', 'slug'),
+    ]);
 
         return $schema
             ->components([
@@ -57,7 +57,7 @@ class ProductForm
 
                         TextInput::make('price')
                             ->numeric()
-                            ->prefix('$')
+                            ->prefix('rs')
                             ->required(),
 
                         TextInput::make('discount')

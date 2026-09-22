@@ -38,8 +38,12 @@ class ProductsTable
                 TextColumn::make('category_id')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('category')
-                    ->searchable(),
+               TextColumn::make('category_id')
+                    ->label('Category')
+                    ->formatStateUsing(function ($state) {
+                        return \App\Models\Category::find($state)?->name ?? 'No Category';
+                    })
+                    ->sortable(),
                 TextColumn::make('dokan_id')
                     ->numeric()
                     ->sortable(),
