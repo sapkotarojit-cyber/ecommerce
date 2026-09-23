@@ -11,6 +11,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use App\Models\Category;
 
 class ProductForm
 {
@@ -18,7 +19,12 @@ class ProductForm
     {
         $categorySelect = Select::make('category_id')
             ->label('Category')
-            ->relationship('category', 'name')
+            ->options(
+                Category::query()
+                    ->where('is_active', true)
+                    ->pluck('name', 'id')
+                    ->toArray()
+            )
             ->searchable()
             ->preload()
             ->required()

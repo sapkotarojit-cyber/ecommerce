@@ -76,43 +76,91 @@
                 @foreach($products as $product)
                     <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group flex flex-col justify-between">
                         <div>
-                            <a href="{{ route('product', $product->id) }}">
-                                <div class="relative h-64 bg-gray-100 overflow-hidden">
-                                    @php
-                                        $firstVariant = $product->varients->first();
-                                        $imageUrl = null;
+                        <a href="{{ route('product', $product->id) }}">
+                            <div class="relative h-64 bg-gray-100 overflow-hidden">
 
-                                        if ($firstVariant && !empty($firstVariant->images)) {
-                                            $rawImages = $firstVariant->images;
-                                            
-                                            if (is_array($rawImages)) {
-                                                $images = $rawImages;
-                                            } elseif (is_string($rawImages)) {
-                                                $decoded = json_decode($rawImages, true);
-                                                $images = is_array($decoded) ? $decoded : [$rawImages];
-                                            } else {
-                                                $images = [];
-                                            }
+                                @php
+                                    $firstVariant = $product->varients->first();
+                                    $imageUrl = null;
 
-                                            if (!empty($images[0])) {
-                                                $path = trim(str_replace(['\\', '"', '[', ']'], '', $images[0]));
-                                                $imageUrl = filter_var($path, FILTER_VALIDATE_URL) ? $path : asset('storage/' . ltrim($path, '/'));
-                                            }
+                                    // Get discount
+                                    $discount = $firstVariant->discount ?? 0;
+
+                                    if ($firstVariant && !empty($firstVariant->images)) {
+                                        $rawImages = $firstVariant->images;
+
+                                        if (is_array($rawImages)) {
+                                            $images = $rawImages;
+                                        } elseif (is_string($rawImages)) {
+                                            $decoded = json_decode($rawImages, true);
+                                            $images = is_array($decoded) ? $decoded : [$rawImages];
+                                        } else {
+                                            $images = [];
                                         }
-                                    @endphp
 
-                                    @if($imageUrl)
-                                        <img src="{{ $imageUrl }}" 
-                                             alt="{{ $product->title }}" 
-                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                                    @else
-                                        <div class="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">
-                                            <i class="fas fa-image text-4xl"></i>
-                                        </div>
-                                    @endif
-                                </div>
-                            </a>
-                            
+                                        if (!empty($images[0])) {
+                                            $path = trim(
+                                                str_replace(
+                                                    ['\\', '"', '[', ']'],
+                                                    '',
+                                                    $images[0]
+                                                )
+                                            );
+
+                                            $imageUrl = filter_var($path, FILTER_VALIDATE_URL)
+                                                ? $path
+                                                : asset('storage/' . ltrim($path, '/'));
+                                        }
+                                    }
+                                @endphp
+
+
+                                {{-- Product Image --}}
+                                @if($imageUrl)
+
+                                    <img
+                                        src="{{ $imageUrl }}"
+                                        alt="{{ $product->title }}"
+                                        class="w-full h-full object-cover
+                                            group-hover:scale-105
+                                            transition-transform duration-300">
+
+                                @else
+
+                                    <div class="w-full h-full flex items-center justify-center
+                                                bg-gray-200 text-gray-400">
+
+                                        <i class="fas fa-image text-4xl"></i>
+
+                                    </div>
+
+                                @endif
+
+
+                                {{-- DISCOUNT BADGE - TOP LEFT --}}
+                                @if($discount > 0)
+
+                                    <div class="absolute top-3 right-3 z-10">
+
+                                        <span class="inline-flex items-center
+                                                    px-3 py-1
+                                                    bg-green-500
+                                                    text-white
+                                                    text-xs
+                                                    font-bold
+                                                    rounded-md
+                                                    shadow-md">
+
+                                            {{ $discount }}% OFF
+
+                                        </span>
+
+                                    </div>
+
+                                @endif
+
+                            </div>
+                        </a>                            
                             <div class="p-4">
                                 <div class="flex items-center justify-between mb-2">
                                     <span class="text-xs text-[#c9a84c] font-semibold bg-[#c9a84c]/10 px-2 py-1 rounded-full">
@@ -128,31 +176,80 @@
                             </div>
                         </div>
 
-                        <!-- Pricing & Detail Link Footer -->
-                        <div class="p-4 pt-0">
-                            <div class="flex items-center justify-between pt-3 border-t border-gray-100">
-                                <div>
-                                    @if($product->varients->first())
-                                        @php 
-                                            $variant = $product->varients->first();
-                                            $price = $variant->price ?? 0;
-                                            $discount = $variant->discount ?? 0;
-                                        @endphp
-                                        @if($discount > 0)
-                                            <span class="text-sm text-gray-400 line-through">Rs. {{ number_format($price, 2) }}</span>
-                                            <span class="text-lg font-bold text-[#1a2a6c] ml-1">Rs. {{ number_format($price - ($price * $discount / 100), 2) }}</span>
-                                        @else
-                                            <span class="text-lg font-bold text-[#1a2a6c]">Rs. {{ number_format($price, 2) }}</span>
-                                        @endif
-                                    @else
-                                        <span class="text-sm text-gray-400">Price unavailable</span>
-                                    @endif
-                                </div>
-                                <a href="{{ route('product', $product->id) }}" class="text-[#c9a84c] hover:text-[#b8963a]">
-                                    <i class="fas fa-arrow-right"></i>
-                                </a>
-                            </div>
-                        </div>
+                                    <!-- Pricing & Detail Link Footer -->
+            <div class="p-4 pt-0">
+                <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+
+                    <div>
+
+            @if($product->varients->first())
+
+                @php
+                    $variant = $product->varients->first();
+
+                    $price = $variant->price ?? 0;
+                    $discount = $variant->discount ?? 0;
+
+                    // Calculate discounted price
+                    $discountedPrice = $price;
+
+                    if ($discount > 0) {
+                        $discountedPrice = $price - (($price * $discount) / 100);
+                    }
+                @endphp
+
+
+                @if($discount > 0)
+
+                   
+
+
+                    <!-- Original + Discounted Price -->
+                    <div class="flex items-center gap-2">
+
+                        <!-- Original Price -->
+                        <span class="text-sm text-gray-400 line-through">
+                            Rs. {{ number_format($price, 2) }}
+                        </span>
+
+                        <!-- Discounted Price -->
+                        <span class="text-lg font-bold text-[#1a2a6c]">
+                            Rs. {{ number_format($discountedPrice, 2) }}
+                        </span>
+
+                    </div>
+
+                        @else
+
+                            <!-- Normal Price -->
+                            <span class="text-lg font-bold text-[#1a2a6c]">
+                                Rs. {{ number_format($price, 2) }}
+                            </span>
+
+                        @endif
+
+                    @else
+
+                        <span class="text-sm text-gray-400">
+                            Price unavailable
+                        </span>
+
+                    @endif
+
+                </div>
+
+
+                <!-- View Product Arrow -->
+                <a href="{{ route('product', $product->id) }}"
+                class="text-[#c9a84c] hover:text-[#b8963a] transition-transform
+                        group-hover:translate-x-1">
+
+                    <i class="fas fa-arrow-right"></i>
+
+                </a>
+
+            </div>
+        </div>
                     </div>
                 @endforeach
             </div>

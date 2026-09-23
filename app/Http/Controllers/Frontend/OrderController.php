@@ -435,57 +435,96 @@ class OrderController extends Controller
         return redirect()->route('orders.index')->with('error', 'Payment verification failed.');
     }
 
-    public function bankSuccess(Request $request)
-    {
-        $request->validate([
-            'payment_receipt' => 'required|file|mimes:jpeg,png,jpg,pdf|max:2048',
-            'terms' => 'required|accepted',
-        ]);
+   public function bankSuccess(Request $request)
+{
+    $request->validate([
+        'payment_receipt' => 'required|file|mimes:jpeg,png,jpg,pdf|max:2048',
+        'terms' => 'required|accepted',
+    ]);
 
-        $pendingOrderData = session()->get('pending_gateway_order');
+    $pendingOrderData = session()->get('pending_gateway_order');
 
-        if (!$pendingOrderData) {
-            return redirect()->route('orders.index')->with('error', 'Session expired or order session data not found.');
-        }
-
-        $masterTracking = $pendingOrderData['master_tracking'];
-
-        if ($request->hasFile('payment_receipt')) {
-            $file = $request->file('payment_receipt');
-            $filename = 'receipt_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $receiptPath = $file->storeAs('payment_receipts', $filename, 'public');
-        }
-
-        $orders = Order::with('order_items.varient')->where('tracking_number', 'like', $masterTracking . '%')->get();
-
-        foreach($orders as $order) {
-            foreach($order->order_items as $item) {
-                if ($item->varient) {
-                    $item->varient->decrement('qty', $item->qty);
-                }
-            }
-        }
-
-        $updatedCount = Order::where('tracking_number', 'like', $masterTracking . '%')
-            ->update([
-                'payment_status' => 'pending', 
-                'order_status' => 'pending',   
-            ]);
-
-        if ($updatedCount > 0) {
-            // Clear ONLY the selected checked items from cart upon bank receipt upload
-            $selectedCartIds = session()->get('checkout_cart_ids');
-            if ($selectedCartIds) {
-                Cart::where('user_id', Auth::id())->whereIn('id', $selectedCartIds)->delete();
-            }
-            session()->forget('checkout_cart_ids');
-            session()->forget('pending_gateway_order');
-
-            return redirect()->route('orders.index')->with('success', 'Bank transfer receipt submitted successfully! Awaiting verification.');
-        }
-
-        return redirect()->route('orders.index')->with('error', 'No matching pending orders found for this bank transfer.');
+    if (!$pendingOrderData) {
+        return redirect()
+            ->route('orders.index')
+            ->with('error', 'Session expired or order session data not found.');
     }
+
+    $masterTracking = $pendingOrderData['master_tracking'];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Upload Payment Receipt
+    |--------------------------------------------------------------------------
+    */
+    $receiptPath = null;
+
+    if ($request->hasFile('payment_receipt')) {
+        $file = $request->file('payment_receipt');
+
+        $filename = 'receipt_' . time() . '_' . uniqid()
+            . '.' . $file->getClientOriginalExtension();
+
+        $receiptPath = $file->storeAs(
+            'payment_receipts',
+            $filename,
+            'public'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find All Orders Created From This Checkout
+    |--------------------------------------------------------------------------
+    */
+    $orders = Order::with('order_items.varient')
+        ->where('tracking_number', 'like', $masterTracking . '%')
+        ->get();
+
+    if ($orders->isEmpty()) {
+        return redirect()
+            ->route('orders.index')
+            ->with('error', 'No matching pending orders found for this bank transfer.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Save Receipt Path To Every Related Order
+    |--------------------------------------------------------------------------
+    */
+    foreach ($orders as $order) {
+
+        $order->update([
+            'payment_receipt' => $receiptPath,
+            'payment_status' => 'pending',
+            'order_status' => 'pending',
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clear Selected Cart Items
+    |--------------------------------------------------------------------------
+    */
+    $selectedCartIds = session()->get('checkout_cart_ids');
+
+    if ($selectedCartIds) {
+        Cart::where('user_id', Auth::id())
+            ->whereIn('id', $selectedCartIds)
+            ->delete();
+    }
+
+    session()->forget('checkout_cart_ids');
+    session()->forget('pending_gateway_order');
+
+    return redirect()
+        ->route('orders.index')
+        ->with(
+            'success',
+            'Bank transfer receipt submitted successfully! Awaiting verification.'
+        );
+}
+
 
     public function esewaFailure(Request $request)
     {

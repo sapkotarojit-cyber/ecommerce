@@ -1,0 +1,10 @@
+[90m= [39m[34;4mApp\Models\Product[39;24m {#9658
+    [34mid[39m: [35m3[39m,
+    [34mcategory_id[39m: [35m3[39m,
+    [34mtitle[39m: [32m"[39m[32mtoilet paper[39m[32m"[39m,
+    [34mcategory[39m: [36mnull[39m,
+    [34mdescription[39m: [32m"[39m[32mused in toilet[39m[32m"[39m,
+    [34mdokan_id[39m: [35m2[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-09-21 08:31:42[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-09-21 08:31:42[39m[32m"[39m,
+  }

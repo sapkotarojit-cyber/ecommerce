@@ -21,7 +21,7 @@ class Product extends Model
 
     public function dokan(): BelongsTo
     {
-        return $this->belongsTo(Dokan::class);
+        return $this->belongsTo(Dokan::class, 'dokan_id');
     }
 
     public function order_items()

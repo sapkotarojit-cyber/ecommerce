@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Orders\Schemas;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Filament\Forms\Components\FileUpload;
 
 class OrderForm
 {
@@ -82,6 +83,18 @@ class OrderForm
                     ])
                     ->default('pending')
                     ->required(),
+                    
+FileUpload::make('payment_receipt')
+    ->label('Payment Receipt')
+    ->disk('public')
+    ->directory('payment_receipts')
+    ->image()
+    ->imagePreviewHeight('300')
+    ->openable()
+    ->downloadable()
+    ->disabled()
+    ->dehydrated(false)
+    ->columnSpanFull(),
             ]);
     }
 }
