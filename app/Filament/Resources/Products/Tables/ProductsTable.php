@@ -44,8 +44,9 @@ class ProductsTable
                         return \App\Models\Category::find($state)?->name ?? 'No Category';
                     })
                     ->sortable(),
-                TextColumn::make('dokan_id')
-                    ->numeric()
+                TextColumn::make('dokan.company_name')
+                    ->label('Vendor')
+                    ->searchable()
                     ->sortable(),
                 TextColumn::make('created_at')
                     ->dateTime()

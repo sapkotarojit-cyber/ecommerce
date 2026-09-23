@@ -51,6 +51,13 @@ class Order extends Model
         return $this->belongsTo(ShippingAddress::class, 'shipping_address_id');
     }
 
+  
+
+    public function returnRequests()
+{
+    return $this->hasMany(ReturnRequest::class);
+}
+
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);

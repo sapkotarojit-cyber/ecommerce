@@ -31,6 +31,14 @@
                         </button>
                     </form>
                 @endif
+
+               @if($order->order_status === 'completed' && $order->returnRequests->isEmpty())
+                <a href="{{ route('orders.return.form', $order->id) }}"
+                class="inline-flex items-center px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-sm font-semibold text-amber-700 hover:bg-amber-100 transition-colors">
+                    <i class="fa-solid fa-rotate-left mr-2"></i>
+                    Request Return
+                </a>
+            @endif
             </div>
         </div>
 

@@ -11,9 +11,11 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
+use Filament\Navigation\MenuItem;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook; 
+use App\Filament\Vendor\Widgets\VendorMonthlySalesChart;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -31,6 +33,7 @@ class DokanPanelProvider extends PanelProvider
             ->path('vendor')
             ->favicon(asset('logo1.png'))
             ->login()
+            ->profile()
             ->homeUrl('/')
             ->brandName(function () {
                 $user = Auth::guard('dokan')->user() 
@@ -57,6 +60,9 @@ class DokanPanelProvider extends PanelProvider
             ->resources([
                 ProductResource::class,
             ])
+
+        
+
             ->discoverResources(in: app_path('Filament/Dokan/Resources'), for: 'App\Filament\Dokan\Resources')
             ->discoverPages(in: app_path('Filament/Dokan/Pages'), for: 'App\Filament\Dokan\Pages')
             ->pages([
@@ -67,6 +73,7 @@ class DokanPanelProvider extends PanelProvider
                 VendorStatsOverview::class,
                 RecentOrders::class,
                 TopProductsWidget::class,
+                VendorMonthlySalesChart::class,
             ])
             ->middleware([
                 EncryptCookies::class,

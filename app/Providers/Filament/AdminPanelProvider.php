@@ -9,6 +9,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Navigation\MenuItem;
 use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
@@ -20,6 +21,7 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use App\Filament\Widgets\OrdersChart;
 use App\Filament\Widgets\StatsOverview;
+use App\Filament\Widgets\ActiveDokans;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -37,9 +39,10 @@ class AdminPanelProvider extends PanelProvider
             ->authGuard('admin')
             ->authPasswordBroker('admins')
             ->passwordReset() 
-            ->colors([
-                'primary' => Color::Amber,
-            ])
+            ->colors(['primary' => Color::Amber,])
+            ->profile()
+            
+            
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -49,6 +52,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                OrdersChart::class,
                StatsOverview::class,
+                ActiveDokans::class,
             ])
             ->middleware([
                 EncryptCookies::class,

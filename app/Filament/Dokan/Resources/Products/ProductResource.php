@@ -7,6 +7,8 @@ use App\Filament\Dokan\Resources\Products\Pages\EditProduct;
 use App\Filament\Dokan\Resources\Products\Pages\ListProducts;
 use App\Filament\Dokan\Resources\Products\Schemas\ProductForm;
 use App\Filament\Dokan\Resources\Products\Tables\ProductsTable;
+use App\Filament\Dokan\Resources\Orders\OrderResource;
+use App\Filament\Dokan\Resources\ReturnRequests\ReturnRequestResource;
 use App\Models\Dokan;
 use App\Models\Product;
 use BackedEnum;

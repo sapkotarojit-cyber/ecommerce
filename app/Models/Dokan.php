@@ -5,6 +5,7 @@ namespace App\Models;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
+use App\Models\Product;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -53,10 +54,12 @@ class Dokan extends Authenticatable implements HasName, FilamentUser
         ];
     }
 
-    public function products()
+   
+        public function products()
     {
-        return $this->hasMany(Product::class);
+        return $this->hasMany(Product::class, 'dokan_id');
     }
+    
 
     public function carts()
     {
@@ -67,4 +70,5 @@ class Dokan extends Authenticatable implements HasName, FilamentUser
     {
         return $this->hasMany(Order::class);
     }
+
 }

@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ShippingAddress;
 use App\Models\ProductVarient; 
+use App\Models\ReturnRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -512,13 +513,19 @@ class OrderController extends Controller
     }
 
     public function show($id)
-    {
-        $order = Order::with(['order_items.product', 'order_items.varient.product', 'shipping_address', 'dokan'])
-            ->where('user_id', Auth::id())
-            ->findOrFail($id);
+{
+    $order = Order::with([
+        'order_items.product',
+        'order_items.varient.product',
+        'shipping_address',
+        'dokan',
+        'returnRequests',
+    ])
+    ->where('user_id', Auth::id())
+    ->findOrFail($id);
 
-        return view('frontend.orders.show', compact('order'));
-    }
+    return view('frontend.orders.show', compact('order'));
+}
 
     public function cancel($id)
     {
@@ -532,6 +539,80 @@ class OrderController extends Controller
 
         return redirect()->back()->with('success', 'Order cancelled successfully.');
     }
+
+    /**
+ * Show return request form.
+ */
+public function returnForm($id)
+{
+    $order = Order::with([
+        'order_items.product',
+        'order_items.varient',
+        'shipping_address',
+        'dokan',
+        'returnRequests',
+    ])
+    ->where('user_id', Auth::id())
+    ->findOrFail($id);
+
+    // Only completed orders can be returned.
+    if ($order->order_status !== 'completed') {
+        return redirect()
+            ->route('orders.show', $order->id)
+            ->with('error', 'Only completed orders can be returned.');
+    }
+
+    // Don't allow another request if one already exists.
+    if ($order->returnRequests()->exists()) {
+        return redirect()
+            ->route('orders.show', $order->id)
+            ->with('error', 'A return request already exists for this order.');
+    }
+
+    return view('frontend.orders.return', compact('order'));
+}
+
+/**
+ * Submit customer return request.
+ */
+public function submitReturn(Request $request, $id)
+{
+    $request->validate([
+        'reason' => 'required|string|max:1000',
+    ]);
+
+    $order = Order::where('user_id', Auth::id())
+        ->with('returnRequests')
+        ->findOrFail($id);
+
+    // Only completed orders can be returned.
+    if ($order->order_status !== 'completed') {
+        return redirect()
+            ->route('orders.show', $order->id)
+            ->with('error', 'Only completed orders can be returned.');
+    }
+
+    // Prevent duplicate requests.
+    if ($order->returnRequests()->exists()) {
+        return redirect()
+            ->route('orders.show', $order->id)
+            ->with('error', 'A return request already exists for this order.');
+    }
+
+    ReturnRequest::create([
+        'order_id' => $order->id,
+        'user_id' => Auth::id(),
+        'dokan_id' => $order->dokan_id,
+        'reason' => $request->reason,
+        'status' => 'requested',
+        'refund_status' => 'pending',
+        'refund_amount' => $order->total_amount,
+    ]);
+
+    return redirect()
+        ->route('orders.show', $order->id)
+        ->with('success', 'Your return request has been submitted successfully.');
+}
 
     public function invoice($id)
     {

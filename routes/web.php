@@ -113,15 +113,19 @@ Route::middleware('auth')->group(function () {
 
     // Order & Dashboard Routes (Protected)
     Route::prefix('orders')->name('orders.')->group(function () {
-        Route::get('/', [OrderController::class, 'index'])->name('index');
-        Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
-        Route::post('/', [OrderController::class, 'store'])->name('store'); 
-        Route::get('/{id}', [OrderController::class, 'show'])->name('show');
-        Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
-        Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');
-        Route::post('/cart/checkout-selected', [OrderController::class, 'postCheckoutSelected'])->name('cart.checkout.selected');
-        Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
-    });
+    Route::get('/', [OrderController::class, 'index'])->name('index');
+    Route::get('/checkout', [OrderController::class, 'checkout'])->name('checkout');
+    Route::post('/', [OrderController::class, 'store'])->name('store');
+
+    Route::get('/{id}', [OrderController::class, 'show'])->name('show');
+    Route::post('/{id}/cancel', [OrderController::class, 'cancel'])->name('cancel');
+    Route::get('/{id}/invoice', [OrderController::class, 'invoice'])->name('invoice');
+
+    Route::get('/{id}/return', [OrderController::class, 'returnForm'])->name('return.form');
+    Route::post('/{id}/return', [OrderController::class, 'submitReturn'])->name('return.submit');
+
+    Route::post('/cart/checkout-selected', [OrderController::class, 'postCheckoutSelected'])->name('cart.checkout.selected');
+});
 
     // Track Order Routes (Protected - Requires Login)
     Route::get('/track-order', [OrderController::class, 'trackForm'])->name('orders.track');

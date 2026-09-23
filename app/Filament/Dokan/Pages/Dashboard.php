@@ -6,6 +6,8 @@ use App\Filament\Dokan\Widgets\RecentOrders;
 use App\Filament\Dokan\Widgets\StatsOverview;
 use App\Filament\Dokan\Widgets\TopProductsWidget;
 use App\Filament\Dokan\Widgets\VendorStatsOverview;
+use App\Filament\Dokan\Widgets\VendorMonthlySalesChart;
+
 use Filament\Pages\Page;
 
 class Dashboard extends Page
@@ -24,6 +26,7 @@ class Dashboard extends Page
         return [
             VendorStatsOverview::class,
             RecentOrders::class,
+            VendorMonthlySalesChart::class,
         ];
     }
 
