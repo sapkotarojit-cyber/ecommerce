@@ -2,6 +2,7 @@
 
 namespace App\Filament\Dokan\Resources\Orders\Schemas;
 
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
@@ -44,14 +45,14 @@ class OrderForm
                             ->label('Customer Shipping Address')
                             ->relationship(
                                 'shippingAddress',
-                                'address' // Changed from 'full_address' to an existing column like 'address'
+                                'address'
                             )
                             ->disabled()
                             ->dehydrated(false),
 
                     ]),
 
-                Section::make('Order Status')
+                Section::make('Payment Information')
                     ->schema([
 
                         Select::make('order_status')
@@ -77,6 +78,16 @@ class OrderForm
                             ->label('Payment Method')
                             ->disabled()
                             ->dehydrated(false),
+
+                        FileUpload::make('payment_receipt')
+                            ->label('Payment Receipt')
+                            ->disk('public')
+                            ->image()
+                            ->openable()
+                            ->downloadable()
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
 
                     ])
                     ->columns(3),

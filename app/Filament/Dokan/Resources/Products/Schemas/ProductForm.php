@@ -2,72 +2,112 @@
 
 namespace App\Filament\Dokan\Resources\Products\Schemas;
 
+use App\Models\Category;
+use App\Models\Dokan;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class ProductForm
 {
     public static function configure(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                Section::make('Product')
-                    ->schema([
-                        TextInput::make('title')
-                            ->required(),
+        return $schema->components([
 
-                        Select::make('category_id')
-                            ->label('Category')
-                            ->relationship('category', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->createOptionForm([
-                                TextInput::make('name')
-                                    ->label('Category Name')
-                                    ->required()
-                                    ->unique('categories', 'name'),
-                            ])
-                            ->required(),
+            Select::make('category_id')
+                ->label('Category')
+                ->options(
+                    Category::query()
+                        ->where('is_active', true)
+                        ->pluck('name', 'id')
+                        ->toArray()
+                )
+                ->searchable()
+                ->preload()
+                ->required()
+                ->createOptionForm([
+                    TextInput::make('name')
+                        ->label('Category Name')
+                        ->required()
+                        ->unique('categories', 'name'),
 
-                        RichEditor::make('description')
-                            ->required()
-                            ->columnSpanFull(),
-                    ])
-                    ->columnSpanFull(),
+                    TextInput::make('slug')
+                        ->label('Category Slug')
+                        ->required()
+                        ->unique('categories', 'slug'),
+                ]),
 
-                Repeater::make('varients')
-                    ->relationship('varients')
-                    ->columnSpanFull()
-                    ->grid(2)
-                    ->schema([
-                        TextInput::make('title')
-                            ->required(),
+            TextInput::make('title')
+                ->required()
+                ->maxLength(255),
 
-                        TextInput::make('price')
-                            ->numeric()
-                            ->prefix('Rs.')
-                            ->required(),
+            Textarea::make('description')
+                ->required()
+                ->columnSpanFull(),
 
-                        TextInput::make('discount')
-                            ->numeric()
-                            ->suffix('%')
-                            ->default(0)
-                            ->required(),
+            Repeater::make('varients')
+                ->relationship('varients')
+                ->schema([
 
-                        TextInput::make('qty')
-                            ->numeric()
-                            ->minValue(0)
-                            ->required(),
+                    TextInput::make('title')
+                        ->label('Variant Title (e.g. Red / XL)')
+                        ->required()
+                        ->maxLength(255),
 
-                        FileUpload::make('images')
-                            ->required()
-                            ->multiple(),
-                    ]),
-            ]);
+                    TextInput::make('price')
+                        ->numeric()
+                        ->prefix('Rs.')
+                        ->required(),
+
+                    TextInput::make('discount')
+                        ->numeric()
+                        ->default(0)
+                        ->suffix('%'),
+
+                    TextInput::make('qty')
+                        ->label('Stock Quantity')
+                        ->numeric()
+                        ->required()
+                        ->default(1),
+
+                    FileUpload::make('images')
+                        ->label('Product Images')
+                        ->multiple()
+                        ->image()
+                        ->disk('public')
+                        ->directory('product-variants')
+                        ->required(false)
+                        ->columnSpanFull(),
+
+                ])
+                ->columns(3)
+                ->defaultItems(1)
+                ->columnSpanFull()
+                ->required()
+                ->label('Product Variants'),
+
+            Hidden::make('dokan_id')
+                ->default(function () {
+                    $user = Filament::auth()->user()
+                        ?? auth()->guard('dokan')->user();
+
+                    if (! $user) {
+                        return null;
+                    }
+
+                    return $user instanceof Dokan
+                        ? $user->id
+                        : (
+                            Dokan::where('user_id', $user->id)->value('id')
+                            ?? $user->dokan_id
+                        );
+                }),
+
+        ]);
     }
 }

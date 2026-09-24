@@ -3,13 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+
 
 class Category extends Model
 {
-
-protected $fillable = [
+    protected $fillable = [
         'name',
         'slug',
         'is_active',
@@ -19,9 +18,10 @@ protected $fillable = [
     {
         return $this->hasMany(Product::class, 'category_id');
     }
-
-
-
+    public function category()
+{
+    return $this->belongsTo(Category::class, 'category_id');
+}
 
     protected static function boot()
     {

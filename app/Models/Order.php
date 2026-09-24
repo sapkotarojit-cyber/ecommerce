@@ -7,17 +7,17 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     protected $fillable = [
-    'user_id',
-    'dokan_id',
-    'shipping_address_id',
-    'total_amount',
-    'status',
-    'order_status',
-    'payment_method',
-    'payment_status',
-    'tracking_number',
-    'payment_receipt',
-];
+        'user_id',
+        'dokan_id',
+        'shipping_address_id',
+        'total_amount',
+        'status',
+        'order_status',
+        'payment_method',
+        'payment_status',
+        'tracking_number',
+        'payment_receipt',
+    ];
 
     protected static function boot()
     {
@@ -29,8 +29,6 @@ class Order extends Model
             }
         });
     }
-
-    
 
     public function user()
     {
@@ -44,29 +42,26 @@ class Order extends Model
 
     public function shippingAddress()
     {
-        return $this->belongsTo(ShippingAddress::class, 'shipping_address_id');
+        return $this->belongsTo(ShippingAddress::class);
     }
 
     public function shipping_address()
     {
-        return $this->belongsTo(ShippingAddress::class, 'shipping_address_id');
+        return $this->shippingAddress();
     }
-
-  
-
-    public function returnRequests()
-{
-    return $this->hasMany(ReturnRequest::class);
-}
 
     public function orderItems()
     {
         return $this->hasMany(OrderItem::class);
     }
 
-    // Alias for orderItems to prevent relation not found exceptions
     public function order_items()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->orderItems();
+    }
+
+    public function returnRequests()
+    {
+        return $this->hasMany(ReturnRequest::class);
     }
 }

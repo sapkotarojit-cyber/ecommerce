@@ -1,0 +1,431 @@
+.
+├── app
+│   ├── Filament
+│   │   ├── Dokan
+│   │   │   ├── Pages
+│   │   │   │   └── Dashboard.php
+│   │   │   ├── Resources
+│   │   │   │   ├── Orders
+│   │   │   │   │   ├── OrderResource.php
+│   │   │   │   │   ├── Pages
+│   │   │   │   │   │   ├── EditOrder.php
+│   │   │   │   │   │   └── ListOrder.php
+│   │   │   │   │   ├── RelationManagers
+│   │   │   │   │   │   └── OrderItemsRelationManager.php
+│   │   │   │   │   ├── Schemas
+│   │   │   │   │   │   └── OrderForm.php
+│   │   │   │   │   └── Tables
+│   │   │   │   │       └── OrderTable.php
+│   │   │   │   ├── Products
+│   │   │   │   │   ├── Pages
+│   │   │   │   │   │   ├── CreateProduct.php
+│   │   │   │   │   │   ├── EditProduct.php
+│   │   │   │   │   │   └── ListProducts.php
+│   │   │   │   │   ├── ProductResource.php
+│   │   │   │   │   ├── Schemas
+│   │   │   │   │   │   └── ProductForm.php
+│   │   │   │   │   └── Tables
+│   │   │   │   │       └── ProductsTable.php
+│   │   │   │   └── ReturnRequests
+│   │   │   │       ├── Pages
+│   │   │   │       │   ├── CreateReturnRequest.php
+│   │   │   │       │   ├── EditReturnRequest.php
+│   │   │   │       │   └── ListReturnRequests.php
+│   │   │   │       ├── ReturnRequestResource.php
+│   │   │   │       ├── Schemas
+│   │   │   │       │   └── ReturnRequestForm.php
+│   │   │   │       └── Tables
+│   │   │   │           └── ReturnRequestsTable.php
+│   │   │   └── Widgets
+│   │   │       ├── RecentOrders.php
+│   │   │       ├── TopProductsWidget.php
+│   │   │       ├── VendorMonthlySalesChart.php
+│   │   │       └── VendorStatsOverview.php
+│   │   ├── Pages
+│   │   │   └── Auth
+│   │   │       └── Register.php
+│   │   ├── Resources
+│   │   │   ├── Admins
+│   │   │   │   ├── AdminResource.php
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateAdmin.php
+│   │   │   │   │   ├── EditAdmin.php
+│   │   │   │   │   └── ListAdmins.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── AdminForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── AdminsTable.php
+│   │   │   ├── Carts
+│   │   │   │   ├── CartResource.php
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateCart.php
+│   │   │   │   │   ├── EditCart.php
+│   │   │   │   │   └── ListCarts.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── CartForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── CartsTable.php
+│   │   │   ├── Categories
+│   │   │   │   ├── CategoryResource.php
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateCategory.php
+│   │   │   │   │   ├── EditCategory.php
+│   │   │   │   │   └── ListCategories.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── CategoryForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── CategoriesTable.php
+│   │   │   ├── Dokans
+│   │   │   │   ├── DokanResource.php
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateDokan.php
+│   │   │   │   │   ├── EditDokan.php
+│   │   │   │   │   └── ListDokans.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── DokanForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── DokansTable.php
+│   │   │   ├── Orders
+│   │   │   │   ├── OrderResource.php
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateOrder.php
+│   │   │   │   │   ├── EditOrder.php
+│   │   │   │   │   └── ListOrders.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── OrderForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── OrdersTable.php
+│   │   │   ├── Products
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateProduct.php
+│   │   │   │   │   ├── EditProduct.php
+│   │   │   │   │   ├── ListProducts.php
+│   │   │   │   │   └── ManageProducts.php
+│   │   │   │   ├── ProductResource.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── ProductForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── ProductsTable.php
+│   │   │   ├── ReturnRequests
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateReturnRequest.php
+│   │   │   │   │   ├── EditReturnRequest.php
+│   │   │   │   │   └── ListReturnRequests.php
+│   │   │   │   ├── ReturnRequestResource.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── ReturnRequestForm.php
+│   │   │   │   └── Tables
+│   │   │   │       └── ReturnRequestsTable.php
+│   │   │   ├── ShippingAddresses
+│   │   │   │   ├── Pages
+│   │   │   │   │   ├── CreateShippingAddress.php
+│   │   │   │   │   ├── EditShippingAddress.php
+│   │   │   │   │   └── ListShippingAddresses.php
+│   │   │   │   ├── Schemas
+│   │   │   │   │   └── ShippingAddressForm.php
+│   │   │   │   ├── ShippingAddressResource.php
+│   │   │   │   └── Tables
+│   │   │   │       └── ShippingAddressesTable.php
+│   │   │   └── Users
+│   │   │       ├── Pages
+│   │   │       │   ├── CreateUser.php
+│   │   │       │   ├── EditUser.php
+│   │   │       │   └── ListUsers.php
+│   │   │       ├── Schemas
+│   │   │       │   └── UserForm.php
+│   │   │       ├── Tables
+│   │   │       │   └── UsersTable.php
+│   │   │       └── UserResource.php
+│   │   └── Widgets
+│   │       ├── ActiveDokans.php
+│   │       ├── OrdersChart.php
+│   │       └── StatsOverview.php
+│   ├── Http
+│   │   ├── Controllers
+│   │   │   ├── AuthController.php
+│   │   │   ├── Controller.php
+│   │   │   ├── DashBoardController.php
+│   │   │   ├── Frontend
+│   │   │   │   ├── AuthController.php
+│   │   │   │   ├── CartController.php
+│   │   │   │   ├── CheckoutController.php
+│   │   │   │   ├── OrderController.php
+│   │   │   │   ├── PageController.php
+│   │   │   │   ├── ProfileController.php
+│   │   │   │   ├── ReturnRequestController.php
+│   │   │   │   └── ShippingAddressController.php
+│   │   │   ├── OrderController.php
+│   │   │   └── ProductController.php
+│   │   └── Middleware
+│   │       ├── AuthMiddleware.php
+│   │       └── UnAuthMiddleware.php
+│   ├── Mail
+│   │   ├── DokanApplicationReceived.php
+│   │   ├── DokanRequestApproval.php
+│   │   ├── DokanRequestNotification.php
+│   │   ├── DokanRequestRejection.php
+│   │   └── SendVerificationCode.php
+│   ├── Models
+│   │   ├── Admin.php
+│   │   ├── Cart.php
+│   │   ├── Category.php
+│   │   ├── Dokan.php
+│   │   ├── Dokan.php.save
+│   │   ├── OrderItem.php
+│   │   ├── Order.php
+│   │   ├── Product.php
+│   │   ├── ProductVarient.php
+│   │   ├── ReturnRequest.php
+│   │   ├── ShippingAddress.php
+│   │   └── User.php
+│   ├── Providers
+│   │   ├── AppServiceProvider.php
+│   │   └── Filament
+│   │       ├── AdminPanelProvider.php
+│   │       └── DokanPanelProvider.php
+│   └── View
+│       └── Components
+│           ├── Frontendfooter.php
+│           ├── FrontendHeader.php
+│           └── FrontendLayout.php
+├── artisan
+├── boost.json
+├── bootstrap
+│   ├── app.php
+│   └── providers.php
+├── category?-
+├── CLAUDE.md
+├── composer.json
+├── composer.lock
+├── config
+│   ├── app.php
+│   ├── auth.php
+│   ├── cache.php
+│   ├── database.php
+│   ├── filesystems.php
+│   ├── logging.php
+│   ├── mail.php
+│   ├── queue.php
+│   ├── services.php
+│   └── session.php
+├── database
+│   ├── factories
+│   │   └── UserFactory.php
+│   ├── migrations
+│   │   ├── 0001_01_01_000000_create_users_table.php
+│   │   ├── 0001_01_01_000001_create_cache_table.php
+│   │   ├── 0001_01_01_000002_create_jobs_table.php
+│   │   ├── 2026_06_12_181226_create_admins_table.php
+│   │   ├── 2026_06_12_181300_create_categories_table.php
+│   │   ├── 2026_06_12_181356_create_dokans_table.php
+│   │   ├── 2026_06_12_181430_create_products_table.php
+│   │   ├── 2026_06_12_181453_create_product_varients_table.php
+│   │   ├── 2026_06_12_181549_create_shipping_addresses_table.php
+│   │   ├── 2026_06_12_181620_create_carts_table.php
+│   │   ├── 2026_06_12_181639_create_orders_table.php
+│   │   ├── 2026_06_12_181701_create_order_items_table.php
+│   │   ├── 2026_06_20_185209_add_google_id_to_users_table.php
+│   │   ├── 2026_06_25_173154_add_user_id_to_dokans_table.php
+│   │   ├── 2026_06_25_182335_make_dokan_id_nullable_in_products_table.php
+│   │   ├── 2026_09_08_091343_add_tracking_number_to_orders_table.php
+│   │   ├── 2026_09_08_101105_add_category_to_products_table.php
+│   │   ├── 2026_09_09_070132_update_payment_method_in_orders_table.php
+│   │   ├── 2026_09_09_081851_add_missing_columns_to_orders_table.php
+│   │   ├── 2026_09_09_082726_fix_product_variant_column_in_order_items_table.php
+│   │   ├── 2026_09_16_190605_add_rejection_comment_to_dokans_table.php
+│   │   ├── 2026_09_18_090801_create_dokan_password_reset_tokens_table.php
+│   │   ├── 2026_09_18_091314_create_admin_password_reset_tokens_table.php
+│   │   ├── 2026_09_20_173829_add_verification_columns_to_users_table.php
+│   │   ├── 2026_09_20_181819_add_is_admin_to_users_table.php
+│   │   ├── 2026_09_21_065336_add_missing_columns_to_shipping_addresses_table.php
+│   │   ├── 2026_09_21_093350_add_full_address_to_shipping_addresses_table.php
+│   │   ├── 2026_09_23_063117_create_return_requests_table.php
+│   │   ├── 2026_09_23_173119_add_payment_receipt_to_orders_table.php
+│   │   ├── 2026_09_23_174041_add_payment_receipt_to_orders_table.php
+│   │   └── migrations
+│   │       ├── 0001_01_01_000000_create_users_table.php
+│   │       ├── 0001_01_01_000001_create_cache_table.php
+│   │       ├── 0001_01_01_000002_create_jobs_table.php
+│   │       ├── 2026_06_12_181226_create_admins_table.php
+│   │       ├── 2026_06_12_181356_create_dokans_table.php
+│   │       ├── 2026_06_12_181430_create_products_table.php
+│   │       ├── 2026_06_12_181453_create_product_varients_table.php
+│   │       ├── 2026_06_12_181549_create_shipping_addresses_table.php
+│   │       ├── 2026_06_12_181620_create_carts_table.php
+│   │       ├── 2026_06_12_181639_create_orders_table.php
+│   │       └── 2026_06_12_181701_create_order_items_table.php
+│   └── seeders
+│       └── DatabaseSeeder.php
+├── dir
+├── ->first()->images;
+├── 'Invalid
+├── invalidate()
+├── logout()
+├── name
+├── package.json
+├── package-lock.json
+├── phpunit.xml
+├── project-tree.txt
+├── public
+│   ├── build
+│   │   ├── assets
+│   │   │   ├── app-DDq7K6lO.js
+│   │   │   └── app-DzgEc0al.css
+│   │   └── manifest.json
+│   ├── css
+│   │   └── filament
+│   │       └── filament
+│   │           └── app.css
+│   ├── favicon.ico
+│   ├── fonts
+│   │   └── filament
+│   │       └── filament
+│   │           └── inter
+│   │               ├── index.css
+│   │               ├── inter-cyrillic-ext-wght-normal-IYF56FF6.woff2
+│   │               ├── inter-cyrillic-wght-normal-JEOLYBOO.woff2
+│   │               ├── inter-greek-ext-wght-normal-EOVOK2B5.woff2
+│   │               ├── inter-greek-wght-normal-IRE366VL.woff2
+│   │               ├── inter-latin-ext-wght-normal-HA22NDSG.woff2
+│   │               ├── inter-latin-wght-normal-NRMW37G5.woff2
+│   │               └── inter-vietnamese-wght-normal-CE5GGD3W.woff2
+│   ├── hot
+│   ├── images
+│   │   ├── logo2.png
+│   │   ├── logo3.png
+│   │   ├── logo4.png
+│   │   └── logo5.png
+│   ├── index.php
+│   ├── js
+│   │   └── filament
+│   │       ├── actions
+│   │       │   └── actions.js
+│   │       ├── filament
+│   │       │   ├── app.js
+│   │       │   └── echo.js
+│   │       ├── forms
+│   │       │   └── components
+│   │       │       ├── checkbox-list.js
+│   │       │       ├── code-editor.js
+│   │       │       ├── color-picker.js
+│   │       │       ├── date-time-picker.js
+│   │       │       ├── file-upload.js
+│   │       │       ├── key-value.js
+│   │       │       ├── markdown-editor.js
+│   │       │       ├── rich-editor.js
+│   │       │       ├── select.js
+│   │       │       ├── slider.js
+│   │       │       ├── tags-input.js
+│   │       │       └── textarea.js
+│   │       ├── notifications
+│   │       │   └── notifications.js
+│   │       ├── schemas
+│   │       │   ├── components
+│   │       │   │   ├── actions.js
+│   │       │   │   ├── tabs.js
+│   │       │   │   └── wizard.js
+│   │       │   └── schemas.js
+│   │       ├── support
+│   │       │   └── support.js
+│   │       ├── tables
+│   │       │   ├── components
+│   │       │   │   └── columns
+│   │       │   │       ├── checkbox.js
+│   │       │   │       ├── select.js
+│   │       │   │       ├── text-input.js
+│   │       │   │       └── toggle.js
+│   │       │   └── tables.js
+│   │       └── widgets
+│   │           └── components
+│   │               ├── chart.js
+│   │               └── stats-overview
+│   │                   └── stat
+│   ├── logo1.png
+│   └── robots.txt
+├── README.md
+├── regenerateToken()
+├── 'required
+├── 'required'
+├── resources
+│   ├── css
+│   │   └── app.css
+│   ├── js
+│   │   ├── app.js
+│   │   └── bootstrap.js
+│   └── views
+│       ├── components
+│       │   ├── frontend copy
+│       │   │   └── home.blade.php
+│       │   ├── frontend-footer.blade.php
+│       │   ├── frontendfooter.blade.php
+│       │   ├── frontend-header.blade.php
+│       │   └── frontend-layout.blade.php
+│       ├── emails
+│       │   └── verification_code.blade.php
+│       ├── filament
+│       │   ├── dokan
+│       │   │   └── pages
+│       │   │       └── dashboard.blade.php
+│       │   └── pages
+│       │       ├── auth
+│       │       │   └── register.blade.php
+│       │       └── change-password.blade.php
+│       ├── frontend
+│       │   ├── about.blade.php
+│       │   ├── cart
+│       │   │   └── index.blade.php
+│       │   ├── dokan.blade.php
+│       │   ├── forgot-password.blade.php
+│       │   ├── frontend.blade.php
+│       │   ├── frontend-layout.blade.php
+│       │   ├── home.blade.php
+│       │   ├── login.blade.php
+│       │   ├── orders
+│       │   │   ├── checkout.blade.php
+│       │   │   ├── index.blade.php
+│       │   │   ├── invoice.blade.php
+│       │   │   ├── return.blade.php
+│       │   │   ├── show.blade.php
+│       │   │   └── track.blade.php
+│       │   ├── payments
+│       │   │   ├── bank-pay.blade.php
+│       │   │   └── esewa-redirect.blade.php
+│       │   ├── product
+│       │   │   ├── index.blade.php
+│       │   │   └── show.blade.php
+│       │   ├── register.blade.php
+│       │   ├── reset-password.blade.php
+│       │   ├── shipping-address
+│       │   │   ├── create.blade.php
+│       │   │   ├── edit.blade.php
+│       │   │   └── index.blade.php
+│       │   ├── shipping_address.blade.php
+│       │   ├── support.blade.php
+│       │   └── verify-email.blade.php
+│       ├── mail
+│       │   ├── dokan_application_received.blade.php
+│       │   ├── dokan_request_notification.blade.php
+│       │   ├── dokan_request_rejection.blade.php
+│       │   └── request_approval.blade.php
+│       ├── product
+│       │   └── show.blade.php
+│       └── profile
+│           ├── edit.blade.php
+│           └── settings.blade.php
+├── routes
+│   ├── console.php
+│   └── web.php
+├── tail
+├── tailwind.config.js
+├── tatus
+├── tests
+│   ├── Feature
+│   │   └── ExampleTest.php
+│   ├── Pest.php
+│   ├── TestCase.php
+│   └── Unit
+│       └── ExampleTest.php
+├── validate([
+└── vite.config.js
+
+130 directories, 299 files

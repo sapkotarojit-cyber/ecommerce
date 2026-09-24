@@ -15,15 +15,13 @@ class ProductVarient extends Model
         'images',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'images' => 'array',
+            'price' => 'decimal:2',
+            'discount' => 'decimal:2',
+            'qty' => 'integer',
         ];
     }
 

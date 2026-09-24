@@ -40,12 +40,13 @@ class ShippingAddressResource extends Resource
         return [];
     }
 
-    public static function getPages(): array
-    {
-        return [
-            'index' => ListShippingAddresses::route('/'),
-            'create' => CreateShippingAddress::route('/create'),
-            'edit' => EditShippingAddress::route('/{record}/edit'),
-        ];
-    }
+
+
+   public static function getPages(): array
+{
+    return [
+        'index' => ListShippingAddresses::route('/'),
+        'edit' => EditShippingAddress::route('/{record}/edit'),
+    ];
+}
 }

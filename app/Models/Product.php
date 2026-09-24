@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
@@ -24,18 +25,18 @@ class Product extends Model
         return $this->belongsTo(Dokan::class, 'dokan_id');
     }
 
-    public function order_items()
+    public function order_items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
     }
 
-    public function carts()
+    public function carts(): HasMany
     {
         return $this->hasMany(Cart::class);
     }
 
-    public function varients()
+    public function varients(): HasMany
     {
-        return $this->hasMany(ProductVarient::class);
+        return $this->hasMany(ProductVarient::class, 'product_id');
     }
 }
