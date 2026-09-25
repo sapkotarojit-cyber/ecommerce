@@ -12,7 +12,6 @@ class Order extends Model
         'shipping_address_id',
         'total_amount',
         'status',
-        'order_status',
         'payment_method',
         'payment_status',
         'tracking_number',

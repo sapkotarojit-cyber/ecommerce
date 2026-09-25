@@ -20,6 +20,10 @@ class AdminForm
                 TextInput::make('password')
                     ->password()
                     ->required(),
-            ]);
+                    TextInput::make('tracking_number')
+                    ->label('Tracking Number')
+                    ->disabled()
+                    ->dehydrated(false),
+                            ]);
     }
 }

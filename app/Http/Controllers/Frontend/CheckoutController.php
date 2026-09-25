@@ -7,9 +7,11 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\ShippingAddress;
 use App\Models\ProductVarient;
+use App\Mail\OrderPlacedMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 class CheckoutController extends Controller
 {
@@ -167,16 +169,15 @@ class CheckoutController extends Controller
             /*
              * Create the order.
              */
-            $order = Order::create([
-                'user_id' => Auth::id(),
-                'dokan_id' => $items->first()->dokan_id,
-                'shipping_address_id' => $address->id,
-                'total_amount' => $total,
-                'status' => 'pending',
-                'order_status' => 'pending',
-                'payment_method' => $request->payment_method,
-                'payment_status' => 'pending',
-            ]);
+           $order = Order::create([
+            'user_id' => Auth::id(),
+            'dokan_id' => $items->first()->dokan_id,
+            'shipping_address_id' => $address->id,
+            'total_amount' => $total,
+            'status' => 'pending',
+            'payment_method' => $request->payment_method,
+            'payment_status' => 'pending',
+        ]);
 
             /*
              * Create order items AND decrease stock.
@@ -247,6 +248,24 @@ class CheckoutController extends Controller
      */
     session()->forget('checkout_cart_ids');
 
+        /*
+        |--------------------------------------------------------------------------
+        | Send Order Confirmation Email
+        |--------------------------------------------------------------------------
+        */
+
+        $order->load([
+            'user',
+            'dokan',
+            'shippingAddress',
+            'orderItems.product',
+            'orderItems.varient',
+        ]);
+
+        if ($order->user && $order->user->email) {
+            Mail::to($order->user->email)
+                ->send(new OrderPlacedMail($order));
+        }
     /*
      * Payment redirects.
      */

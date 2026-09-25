@@ -15,9 +15,11 @@ class OrderForm
         return $schema->components([
 
             Section::make('Order Information')->schema([
+
                 TextInput::make('tracking_number')
                     ->label('Tracking Number')
-                    ->disabled(),
+                    ->disabled()
+                    ->dehydrated(false),
 
                 Select::make('user_id')
                     ->label('Customer')
@@ -30,18 +32,22 @@ class OrderForm
                     ->prefix('Rs.')
                     ->disabled()
                     ->dehydrated(false),
+
             ])->columns(2),
 
             Section::make('Shipping Address')->schema([
+
                 Select::make('shipping_address_id')
                     ->label('Customer Shipping Address')
                     ->relationship('shippingAddress', 'address')
                     ->disabled()
                     ->dehydrated(false),
+
             ]),
 
-            Section::make('Payment Information')->schema([
-                Select::make('order_status')
+            Section::make('Order & Payment Status')->schema([
+
+                Select::make('status')
                     ->label('Order Status')
                     ->options([
                         'pending' => 'Pending',
@@ -72,6 +78,7 @@ class OrderForm
                     ->downloadable()
                     ->disabled()
                     ->dehydrated(false),
+
             ])->columns(3),
         ]);
     }
