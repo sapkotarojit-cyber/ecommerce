@@ -154,6 +154,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/{id}/invoice', [OrderController::class, 'invoice'])
             ->name('invoice');
+                    
+        Route::get('/{id}/cancel', [OrderController::class, 'cancelForm'])
+            ->name('cancel.create');
 
         Route::post('/{id}/cancel', [OrderController::class, 'cancel'])
             ->name('cancel');

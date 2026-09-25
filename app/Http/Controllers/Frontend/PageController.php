@@ -4,22 +4,21 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Mail\DokanApplicationReceived;
-use App\Mail\DokanRequestNotification;
 use App\Models\Category;
 use App\Models\Dokan;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class PageController extends Controller
 {
     public function home()
     {
-        $products = Product::latest()->get();
-
-        return view('frontend.home', compact('products'));
+        return view('frontend.home', [
+            'products' => Product::latest()->get()
+        ]);
     }
 
     public function support()
@@ -36,95 +35,65 @@ class PageController extends Controller
     {
         $query = Product::with(['dokan', 'varients']);
 
-        // Filter by Category
         if ($request->filled('category')) {
-            $catValue = $request->input('category');
+            $value = $request->category;
 
-            $query->where(function ($q) use ($catValue) {
-                // 1. Direct column match (e.g. if category column stores string name/slug or exact integer ID)
-                $q->where('category', $catValue);
+            $query->where(function ($q) use ($value) {
+                $q->where('category', $value);
 
-                // 2. Foreign key column match (e.g. if category_id column exists on products)
-                if (is_numeric($catValue)) {
-                    $q->orWhere('category_id', $catValue);
+                if (is_numeric($value)) {
+                    $q->orWhere('category_id', $value);
                 }
 
-                // 3. Category relationship match (slug or ID via Category model)
-                if (class_exists('App\Models\Category')) {
-                    $q->orWhereHas('category', function ($catQuery) use ($catValue) {
-                        $catQuery->where('slug', $catValue)
-                            ->orWhere('id', $catValue)
-                            ->orWhere('name', $catValue);
-                    });
-                }
+                $q->orWhereHas('category', function ($cat) use ($value) {
+                    $cat->where('slug', $value)
+                        ->orWhere('id', $value)
+                        ->orWhere('name', $value);
+                });
             });
         }
 
-        // Filter by Price Range
         if ($request->filled('min_price') || $request->filled('max_price')) {
             $query->whereHas('varients', function ($q) use ($request) {
-
                 if ($request->filled('min_price')) {
-                    $q->where('price', '>=', $request->input('min_price'));
+                    $q->where('price', '>=', $request->min_price);
                 }
 
                 if ($request->filled('max_price')) {
-                    $q->where('price', '<=', $request->input('max_price'));
+                    $q->where('price', '<=', $request->max_price);
                 }
             });
         }
 
-        // Apply Sorting
-        switch ($request->input('sort')) {
+        if ($request->sort === 'price_asc') {
+            $query->join(
+                'product_varients',
+                'products.id',
+                '=',
+                'product_varients.product_id'
+            )->orderBy('product_varients.price')
+             ->select('products.*');
 
-            case 'price_asc':
+        } elseif ($request->sort === 'price_desc') {
+            $query->join(
+                'product_varients',
+                'products.id',
+                '=',
+                'product_varients.product_id'
+            )->orderByDesc('product_varients.price')
+             ->select('products.*');
 
-                $query->whereHas('varients')
-                    ->join(
-                        'product_varients',
-                        'products.id',
-                        '=',
-                        'product_varients.product_id'
-                    )
-                    ->orderBy('product_varients.price', 'asc')
-                    ->select('products.*');
-
-                break;
-
-            case 'price_desc':
-
-                $query->whereHas('varients')
-                    ->join(
-                        'product_varients',
-                        'products.id',
-                        '=',
-                        'product_varients.product_id'
-                    )
-                    ->orderBy('product_varients.price', 'desc')
-                    ->select('products.*');
-
-                break;
-
-            case 'newest':
-
-            default:
-
-                $query->latest('products.created_at');
-
-                break;
+        } else {
+            $query->latest('products.created_at');
         }
 
-        // Fetch categories dynamically
-        if (class_exists('App\Models\Category')) {
-            $categories = Category::all();
-        } else {
-            $categories = Product::whereNotNull('category')
+        $categories = class_exists(Category::class)
+            ? Category::all()
+            : Product::whereNotNull('category')
                 ->where('category', '!=', '')
                 ->distinct()
                 ->pluck('category');
-        }
 
-        // Paginate results
         $products = $query->paginate(12)->withQueryString();
 
         return view('frontend.product.index', compact('products', 'categories'));
@@ -132,12 +101,22 @@ class PageController extends Controller
 
     public function product($id)
     {
-        $product = Product::with([
-            'dokan',
-            'varients'
-        ])->findOrFail($id);
+        $product = Product::with(['dokan', 'varients'])->findOrFail($id);
 
-        return view('frontend.product.show', compact('product'));
+        $relatedProducts = Product::with(['dokan', 'varients'])
+            ->where('id', '!=', $product->id)
+            ->when(
+                $product->category,
+                fn ($q) => $q->where('category', $product->category)
+            )
+            ->latest()
+            ->take(4)
+            ->get();
+
+        return view(
+            'frontend.product.show',
+            compact('product', 'relatedProducts')
+        );
     }
 
     public function dokan_registration()
@@ -146,200 +125,111 @@ class PageController extends Controller
     }
 
     public function dokan_registration_submit(Request $request)
-{
-    /*
-    |--------------------------------------------------------------------------
-    | Check Existing Vendor Application
-    |--------------------------------------------------------------------------
-    */
+    {
+        $data = $request->validate([
+            'company_name'        => 'required|string|max:255',
+            'name'                => 'required|string|max:255',
+            'email'               => 'required|email|max:255',
+            'reg_no'              => 'required|string|max:255',
+            'contact_number'      => 'required|string|max:20',
 
-    $email = strtolower(trim($request->email));
-    $regNo = trim($request->reg_no);
+            'business_location'   => 'required|string|max:255',
+            'business_address'    => 'required|string|max:1000',
 
-    $emailVendor = Dokan::where('email', $email)->first();
-    $regNoVendor = Dokan::where('reg_no', $regNo)->first();
+            'business_reg_no'     => 'required|string|max:255',
+            'pan_no'              => 'required|string|max:255',
+            'business_document'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Prevent conflicts with different vendor records
-    |--------------------------------------------------------------------------
-    */
+            'bank_name'           => 'required|string|max:255',
+            'bank_account_name'   => 'required|string|max:255',
+            'bank_account_number' => 'required|string|max:255',
+            'bank_branch'         => 'required|string|max:255',
+            'bank_document'       => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
 
-    if (
-        $emailVendor &&
-        $regNoVendor &&
-        $emailVendor->id !== $regNoVendor->id
-    ) {
-        return redirect()
-            ->back()
-            ->withInput()
-            ->withErrors([
-                'email' => 'This email and registration number belong to different vendor applications.',
-                'reg_no' => 'This registration number is already associated with another vendor.',
-            ]);
-    }
+            'logo'                => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find existing vendor
-    |--------------------------------------------------------------------------
-    */
-
-    $existingDokan = $emailVendor ?? $regNoVendor;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Pending / Approved vendors cannot register again
-    |--------------------------------------------------------------------------
-    */
-
-    if ($existingDokan) {
-
-        if ($existingDokan->status !== Dokan::STATUS_REJECTED) {
-
-            return redirect()
-                ->back()
-                ->withInput()
-                ->withErrors([
-                    'email' => 'This email is already registered as a vendor.',
-                    'reg_no' => 'This registration number is already registered.',
-                ]);
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Registration
-    |--------------------------------------------------------------------------
-    */
-
-    $validated = $request->validate([
-        'company_name' => 'required|string|max:255',
-        'email' => 'required|email',
-        'reg_no' => 'required|string|max:255',
-        'contact_number' => 'required|string|max:20',
-        'logo' => 'required|image|mimes:jpeg,png,jpg,svg|max:2048',
-        'terms' => 'required|accepted',
-    ]);
-
-    try {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Handle Logo Upload
-        |--------------------------------------------------------------------------
-        */
-
-        $file = $request->file('logo');
-
-        $logoPath = null;
-
-        if ($file) {
-
-            $fileName = time() . '_' .
-                preg_replace(
-                    '/[^a-zA-Z0-9.]/',
-                    '',
-                    $file->getClientOriginalName()
-                );
-
-            $file->move(
-                public_path('storage/vendor-logos'),
-                $fileName
-            );
-
-            $logoPath = 'vendor-logos/' . $fileName;
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Re-apply using existing rejected application
-        |--------------------------------------------------------------------------
-        */
-
-        if ($existingDokan) {
-
-            $existingDokan->user_id = Auth::id();
-            $existingDokan->company_name = $validated['company_name'];
-            $existingDokan->email = $email;
-            $existingDokan->reg_no = $regNo;
-            $existingDokan->contact_number = $validated['contact_number'];
-
-            if ($logoPath) {
-                $existingDokan->logo = $logoPath;
-            }
-
-            // Reset rejected application
-            $existingDokan->status = Dokan::STATUS_PENDING;
-            $existingDokan->rejection_comment = null;
-
-            // Make sure old password cannot be used
-            $existingDokan->password = null;
-
-            $existingDokan->save();
-
-            $dokan = $existingDokan;
-
-        } else {
-
-            /*
-            |--------------------------------------------------------------------------
-            | Create completely new vendor application
-            |--------------------------------------------------------------------------
-            */
-
-            $dokan = new Dokan();
-
-            $dokan->user_id = Auth::id();
-            $dokan->company_name = $validated['company_name'];
-            $dokan->email = $email;
-            $dokan->reg_no = $regNo;
-            $dokan->contact_number = $validated['contact_number'];
-            $dokan->logo = $logoPath;
-            $dokan->status = Dokan::STATUS_PENDING;
-
-            $dokan->save();
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Send Application Notification
-        |--------------------------------------------------------------------------
-        */
-
-        Mail::to([
-            'empireinnovation2025@gmail.com',
-            $dokan->email,
-        ])->send(
-            new DokanApplicationReceived($dokan)
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Success
-        |--------------------------------------------------------------------------
-        */
-
-        return redirect()
-            ->back()
-            ->with(
-                'success',
-                'Vendor registration submitted successfully.'
-            );
-
-    } catch (\Throwable $exception) {
-
-        Log::error('Vendor registration failed.', [
-            'exception' => $exception,
+            'terms'               => 'required|accepted',
         ]);
 
-        return redirect()
-            ->back()
-            ->withInput()
-            ->with(
-                'error',
-                'Unable to submit vendor registration.'
+        try {
+            $email = strtolower(trim($data['email']));
+
+            /*
+             * Check existing vendor
+             */
+            $existing = Dokan::where('email', $email)->first();
+
+            if ($existing && $existing->status !== Dokan::STATUS_REJECTED) {
+                return back()
+                    ->withInput()
+                    ->withErrors([
+                        'email' => 'This email is already registered as a vendor.'
+                    ]);
+            }
+
+            /*
+             * Store uploaded files
+             */
+            $data['business_document'] = $request
+                ->file('business_document')
+                ->store('vendor-documents/business', 'public');
+
+            $data['bank_document'] = $request
+                ->file('bank_document')
+                ->store('vendor-documents/bank', 'public');
+
+            $data['logo'] = $request
+                ->file('logo')
+                ->store('vendor-logos', 'public');
+
+            /*
+             * Additional database values
+             */
+            $data['user_id'] = Auth::id();
+            $data['email'] = $email;
+            $data['status'] = Dokan::STATUS_PENDING;
+            $data['password'] = null;
+            $data['rejection_comment'] = null;
+
+            // terms is only for validation, not database
+            unset($data['terms']);
+
+            /*
+             * Save vendor
+             */
+            if ($existing) {
+                $existing->update($data);
+                $dokan = $existing->fresh();
+            } else {
+                $dokan = Dokan::create($data);
+            }
+
+            /*
+             * Send registration email
+             */
+            Mail::to($dokan->email)->send(
+                new DokanApplicationReceived($dokan)
             );
+
+            return back()->with(
+                'success',
+                'Vendor registration submitted successfully. A confirmation email has been sent to your email.'
+            );
+
+        } catch (\Throwable $e) {
+
+            Log::error('Vendor registration failed', [
+                'email' => $request->email,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'Unable to submit vendor registration. Please try again.'
+                );
+        }
     }
 }
-    }

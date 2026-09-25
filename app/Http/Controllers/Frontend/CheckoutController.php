@@ -98,7 +98,7 @@ class CheckoutController extends Controller
     {
         $request->validate([
             'shipping_address_id' => 'required|exists:shipping_addresses,id',
-            'payment_method' => 'required|in:esewa,bank',
+            'payment_method' => 'required|in:esewa,bank,cod',
         ]);
 
         $ids = session('checkout_cart_ids');
@@ -167,12 +167,22 @@ class CheckoutController extends Controller
             return $order;
         });
 
-        session()->forget('checkout_cart_ids');
+       session()->forget('checkout_cart_ids');
 
-        if ($request->payment_method === 'esewa') {
-            return redirect()->route('orders.esewa.pay', $order->id);
-        }
+if ($request->payment_method === 'esewa') {
+    return redirect()->route('orders.esewa.pay', $order->id);
+}
 
-        return redirect()->route('orders.bank.pay', $order->id);
+if ($request->payment_method === 'bank') {
+    return redirect()->route('orders.bank.pay', [
+        'order' => $order->id,
+    ]);
+}
+
+return redirect()
+    ->route('orders.show', $order->id)
+    ->with('success', 'Order placed successfully with Cash on Delivery.');
     }
 }
+
+            

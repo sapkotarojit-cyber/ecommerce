@@ -2,32 +2,20 @@
 
 namespace App\Models;
 
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Models\Contracts\HasName;
-use Filament\Panel;
 use App\Models\Product;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
+use Filament\Panel;
 
 class Dokan extends Authenticatable implements HasName, FilamentUser
 {
     use Notifiable;
 
-    // Define status constants expected by canAccessPanel()
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
-
-    public function canAccessPanel(Panel $panel): bool
-    {
-        // Allows login only if approved
-        return $this->status === self::STATUS_APPROVED;
-    }
-
-    public function getFilamentName(): string
-    {
-        return $this->company_name ?: $this->email;
-    }
 
     protected $fillable = [
         'user_id',
@@ -37,6 +25,16 @@ class Dokan extends Authenticatable implements HasName, FilamentUser
         'password',
         'reg_no',
         'contact_number',
+        'business_location',
+        'business_address',
+        'business_reg_no',
+        'pan_no',
+        'business_document',
+        'bank_name',
+        'bank_account_name',
+        'bank_account_number',
+        'bank_branch',
+        'bank_document',
         'logo',
         'status',
         'rejection_comment',
@@ -54,12 +52,20 @@ class Dokan extends Authenticatable implements HasName, FilamentUser
         ];
     }
 
-   
-        public function products()
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function getFilamentName(): string
+    {
+        return $this->company_name ?: $this->email;
+    }
+
+    public function products()
     {
         return $this->hasMany(Product::class, 'dokan_id');
     }
-    
 
     public function carts()
     {
@@ -70,5 +76,4 @@ class Dokan extends Authenticatable implements HasName, FilamentUser
     {
         return $this->hasMany(Order::class);
     }
-
 }
