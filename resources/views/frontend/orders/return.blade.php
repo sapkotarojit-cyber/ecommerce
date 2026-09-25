@@ -2,6 +2,9 @@
 
 @section('title', 'Request Return - ' . ($order->tracking_number ?? $order->id))
 
+<title>Return Order - EmpireInnovation</title>
+
+
 @section('content')
 <div class="py-8 px-4">
     <div class="max-w-3xl mx-auto">

@@ -47,10 +47,10 @@ class User extends Authenticatable
 
     }
 
-    public function dokan()
-    {
-        return $this->hasOne(Dokan::class);
-    }
+   public function dokan()
+{
+    return $this->hasOne(Dokan::class, 'user_id');
+}
 
     public function shippingAddresses(): HasMany
     {

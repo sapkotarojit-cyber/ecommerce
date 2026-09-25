@@ -182,22 +182,66 @@
             form.submit();
         }
     }
+function updateQty(id, action) {
 
-    function updateQty(id, action) {
-        let input = document.getElementById('qty-' + id);
-        let qty = parseInt(input.value);
-        if(action === 'inc') qty++;
-        if(action === 'dec' && qty > 1) qty--;
+    const input = document.getElementById('qty-' + id);
 
-        fetch('{{ url("cart") }}/' + id, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({ qty: qty })
-        }).then(res => { if(res.ok) location.reload(); });
+    if (!input) {
+        console.error('Quantity input not found:', id);
+        return;
     }
+
+    let qty = parseInt(input.value) || 1;
+
+    if (action === 'inc') {
+        qty++;
+    }
+
+    if (action === 'dec') {
+        if (qty <= 1) {
+            return;
+        }
+
+        qty--;
+    }
+
+    fetch("{{ url('/cart') }}/" + id, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-CSRF-TOKEN": "{{ csrf_token() }}"
+        },
+        body: JSON.stringify({
+            qty: qty
+        })
+    })
+    .then(async response => {
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Unable to update cart.");
+        }
+
+        return data;
+    })
+    .then(data => {
+
+        // Update displayed quantity
+        input.value = data.qty;
+
+        // Reload so subtotal/selected total/vendor totals stay correct
+        location.reload();
+
+    })
+    .catch(error => {
+
+        console.error("Cart update error:", error);
+
+        alert(error.message);
+    });
+}
 </script>
 @endpush
 @endsection

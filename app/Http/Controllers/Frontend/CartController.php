@@ -110,77 +110,112 @@ class CartController extends Controller
     /**
      * Buy now: Add item to cart and redirect straight to checkout.
      */
-    public function buyNow(Request $request)
-    {
-        $request->validate([
-            'varient_id' => 'required|exists:product_varients,id',
-            'qty' => 'required|integer|min:1',
-        ]);
+   public function buyNow(Request $request)
+{
+    $request->validate([
+        'varient_id' => 'required|exists:product_varients,id',
+        'qty' => 'required|integer|min:1',
+    ]);
 
-        $varient = ProductVarient::with('product.dokan')->findOrFail($request->varient_id);
+    $variant = ProductVarient::with('product.dokan')
+        ->findOrFail($request->varient_id);
 
-        if ($varient->qty < $request->qty) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Requested quantity is not available in stock.'
-            ], 422);
-        }
+    $existing = Cart::where('user_id', Auth::id())
+        ->where('varient_id', $variant->id)
+        ->first();
 
-        $existing = Cart::where('user_id', Auth::id())
-            ->where('varient_id', $request->varient_id)
-            ->first();
+    $newQty = $request->qty;
 
-        if ($existing) {
-            $existing->update([
-                'qty' => $existing->qty + $request->qty
-            ]);
-        } else {
-            Cart::create([
-                'user_id' => Auth::id(),
-                'product_id' => $varient->product_id,
-                'varient_id' => $varient->id,
-                'dokan_id' => $varient->product->dokan_id ?? null,
-                'qty' => $request->qty,
-            ]);
-        }
+    if ($existing) {
+        $newQty = $existing->qty + $request->qty;
+    }
+
+    /*
+     * Make sure total cart quantity doesn't exceed stock.
+     */
+    if ($newQty > $variant->qty) {
 
         return response()->json([
-            'success' => true,
-            'redirect_url' => route('orders.checkout')
+            'success' => false,
+            'message' => "Only {$variant->qty} items are available in stock. "
+                . "You already have "
+                . ($existing->qty ?? 0)
+                . " in your cart.",
+        ], 422);
+    }
+
+    if ($existing) {
+
+        $existing->update([
+            'qty' => $newQty,
+        ]);
+
+    } else {
+
+        Cart::create([
+            'user_id' => Auth::id(),
+            'product_id' => $variant->product_id,
+            'varient_id' => $variant->id,
+            'dokan_id' => $variant->product->dokan_id ?? null,
+            'qty' => $request->qty,
         ]);
     }
+
+    /*
+     * Select only this item for checkout.
+     */
+    $cart = Cart::where('user_id', Auth::id())
+        ->where('varient_id', $variant->id)
+        ->firstOrFail();
+
+    session([
+        'checkout_cart_ids' => [$cart->id],
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'redirect_url' => route('orders.checkout'),
+    ]);
+}
 
     /**
      * Update cart item quantity
      */
-    public function update(Request $request, $id)
-    {
-        $request->validate([
-            'qty' => 'required|integer|min:1',
-        ]);
+   public function update(Request $request, $id)
+{
+    $request->validate([
+        'qty' => ['required', 'integer', 'min:1'],
+    ]);
 
-        $cartItem = Cart::where('id', $id)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+    $cart = Cart::where('id', $id)
+        ->where('user_id', Auth::id())
+        ->firstOrFail();
 
-        $varient = ProductVarient::findOrFail($cartItem->varient_id);
+    $variant = ProductVarient::findOrFail($cart->varient_id);
 
-        if ($varient->qty < $request->qty) {
-            return back()->with('error', 'Not enough stock available. Only ' . $varient->qty . ' left.');
-        }
+    $qty = (int) $request->qty;
 
-        $cartItem->qty = $request->qty;
-        $cartItem->save();
-
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Cart updated successfully!'
-            ]);
-        }
-
-        return redirect()->route('cart.index')->with('success', 'Cart updated successfully!');
+    // Check available stock
+    if ($qty > $variant->qty) {
+        return response()->json([
+            'success' => false,
+            'message' => "Only {$variant->qty} items are available in stock.",
+        ], 422);
     }
+
+    $cart->update([
+        'qty' => $qty,
+    ]);
+
+    $cartCount = Cart::where('user_id', Auth::id())->sum('qty');
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Cart updated successfully.',
+        'qty' => $qty,
+        'cart_count' => $cartCount,
+    ]);
+}
 
     /**
      * Remove item from cart

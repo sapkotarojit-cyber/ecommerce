@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\ShippingAddress;
+use App\Models\ProductVarient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -95,48 +96,77 @@ class CheckoutController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $request->validate([
-            'shipping_address_id' => 'required|exists:shipping_addresses,id',
-            'payment_method' => 'required|in:esewa,bank,cod',
-        ]);
+{
+    $request->validate([
+        'shipping_address_id' => 'required|exists:shipping_addresses,id',
+        'payment_method' => 'required|in:esewa,bank,cod',
+    ]);
 
-        $ids = session('checkout_cart_ids');
+    $ids = session('checkout_cart_ids');
 
-        if (empty($ids)) {
-            return redirect()
-                ->route('cart.index')
-                ->with('error', 'Please select items first.');
-        }
+    if (empty($ids)) {
+        return redirect()
+            ->route('cart.index')
+            ->with('error', 'Please select items first.');
+    }
 
-        $items = Cart::where('user_id', Auth::id())
-            ->whereIn('id', $ids)
-            ->with(['varient'])
-            ->get();
+    $address = ShippingAddress::where('id', $request->shipping_address_id)
+        ->where('user_id', Auth::id())
+        ->firstOrFail();
 
-        if ($items->isEmpty()) {
-            return redirect()
-                ->route('cart.index')
-                ->with('error', 'Cart is empty.');
-        }
+    try {
 
-        $address = ShippingAddress::where('id', $request->shipping_address_id)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $order = DB::transaction(function () use ($ids, $address, $request) {
 
-        $order = DB::transaction(function () use ($items, $address, $request) {
+            /*
+             * Get cart items belonging ONLY to this user.
+             */
+            $items = Cart::where('user_id', Auth::id())
+                ->whereIn('id', $ids)
+                ->with(['product', 'varient'])
+                ->get();
+
+            if ($items->isEmpty()) {
+                throw new \Exception('Your selected cart items are empty.');
+            }
 
             $total = 0;
 
+            /*
+             * First check stock for every item.
+             */
             foreach ($items as $item) {
-                $price = (float) ($item->varient->price ?? 0);
-                $discount = (float) ($item->varient->discount ?? 0);
+
+                $variant = ProductVarient::where('id', $item->varient_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$variant) {
+                    throw new \Exception(
+                        "Product variant not found."
+                    );
+                }
+
+                if ($variant->qty < $item->qty) {
+                    $productName = $item->product->title ?? 'Product';
+
+                    throw new \Exception(
+                        "{$productName} does not have enough stock. "
+                        . "Only {$variant->qty} available."
+                    );
+                }
+
+                $price = (float) ($variant->price ?? 0);
+                $discount = (float) ($variant->discount ?? 0);
 
                 $finalPrice = $price - ($price * $discount / 100);
 
                 $total += $finalPrice * $item->qty;
             }
 
+            /*
+             * Create the order.
+             */
             $order = Order::create([
                 'user_id' => Auth::id(),
                 'dokan_id' => $items->first()->dokan_id,
@@ -148,12 +178,41 @@ class CheckoutController extends Controller
                 'payment_status' => 'pending',
             ]);
 
+            /*
+             * Create order items AND decrease stock.
+             */
             foreach ($items as $item) {
-                $price = (float) ($item->varient->price ?? 0);
-                $discount = (float) ($item->varient->discount ?? 0);
+
+                // Lock the variant again inside the transaction
+                $variant = ProductVarient::where('id', $item->varient_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$variant) {
+                    throw new \Exception(
+                        "Product variant no longer exists."
+                    );
+                }
+
+                /*
+                 * Final stock check.
+                 */
+                if ($variant->qty < $item->qty) {
+                    $productName = $item->product->title ?? 'Product';
+
+                    throw new \Exception(
+                        "{$productName} is no longer available in the requested quantity."
+                    );
+                }
+
+                $price = (float) ($variant->price ?? 0);
+                $discount = (float) ($variant->discount ?? 0);
 
                 $finalPrice = $price - ($price * $discount / 100);
 
+                /*
+                 * Create order item.
+                 */
                 $order->orderItems()->create([
                     'product_id' => $item->product_id,
                     'varient_id' => $item->varient_id,
@@ -161,28 +220,61 @@ class CheckoutController extends Controller
                     'amount' => $finalPrice * $item->qty,
                 ]);
 
+                /*
+                 * IMPORTANT:
+                 * Decrease product variant stock.
+                 */
+                $variant->decrement('qty', $item->qty);
+
+                /*
+                 * Remove purchased item from cart.
+                 */
                 $item->delete();
             }
 
             return $order;
         });
 
-       session()->forget('checkout_cart_ids');
+    } catch (\Exception $e) {
 
-if ($request->payment_method === 'esewa') {
-    return redirect()->route('orders.esewa.pay', $order->id);
-}
-
-if ($request->payment_method === 'bank') {
-    return redirect()->route('orders.bank.pay', [
-        'order' => $order->id,
-    ]);
-}
-
-return redirect()
-    ->route('orders.show', $order->id)
-    ->with('success', 'Order placed successfully with Cash on Delivery.');
+        return redirect()
+            ->route('cart.index')
+            ->with('error', $e->getMessage());
     }
+
+    /*
+     * Clear selected checkout items.
+     */
+    session()->forget('checkout_cart_ids');
+
+    /*
+     * Payment redirects.
+     */
+    if ($request->payment_method === 'esewa') {
+
+        return redirect()->route(
+            'orders.esewa.pay',
+            $order->id
+        );
+    }
+
+    if ($request->payment_method === 'bank') {
+
+        return redirect()->route(
+            'orders.bank.pay',
+            [
+                'order' => $order->id,
+            ]
+        );
+    }
+
+    return redirect()
+        ->route('orders.show', $order->id)
+        ->with(
+            'success',
+            'Order placed successfully with Cash on Delivery.'
+        );
+}
 }
 
             

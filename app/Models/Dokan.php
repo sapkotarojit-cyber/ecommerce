@@ -8,6 +8,8 @@ use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Dokan extends Authenticatable implements HasName, FilamentUser
 {
@@ -61,6 +63,11 @@ class Dokan extends Authenticatable implements HasName, FilamentUser
     {
         return $this->company_name ?: $this->email;
     }
+    
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class, 'user_id');
+}
 
     public function products()
     {

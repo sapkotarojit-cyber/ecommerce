@@ -15,8 +15,12 @@ class DokanForm
     {
         return $schema
             ->components([
-                TextInput::make('user_id')
-                    ->numeric(),
+               Select::make('user_id')
+                    ->label('User')
+                    ->relationship('user', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->nullable(),
 
                 TextInput::make('email')
                     ->label('Email address')

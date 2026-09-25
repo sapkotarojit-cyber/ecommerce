@@ -2,6 +2,9 @@
 
 @section('title', 'Become a Vendor - Empireinnovation')
 
+<title>Dokan - EmpireInnovation</title>
+
+
 @section('content')
 <section class="py-8 md:py-12">
 <div class="max-w-4xl mx-auto px-4">
