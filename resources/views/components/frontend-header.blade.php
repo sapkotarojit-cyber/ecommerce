@@ -92,7 +92,7 @@
                             <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#c9a84c]">Profile</a>
                             <a href="{{ route('settings') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#c9a84c]">Settings</a>
                             <div class="border-t border-gray-100 my-1"></div>
-                            <a href="{{ route('logout') }}" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50">Logout</a>
+                            <form method="POST" action="{{ route('logout') }}"> @csrf <button type="submit" class="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-red-50" > Logout </button> </form>
                         </div>
                     </div>
                 @else
@@ -132,8 +132,7 @@
                 @auth
                     <a href="{{ route('orders.index') }}" class="block py-2 text-gray-700 hover:text-[#c9a84c] transition-colors">My Orders</a>
                     <a href="{{ route('shipping-address.index') }}" class="block py-2 text-gray-700 hover:text-[#c9a84c] transition-colors">Shipping Addresses</a>
-                    <a href="{{ route('logout') }}" class="block py-2 text-red-600 font-medium">Logout</a>
-                    <a href="{{ route('profile.edit') }}" class="block py-2 text-gray-700 hover:text-[#c9a84c] transition-colors">Profile</a>
+                    <form method="POST" action="{{ route('logout') }}"> @csrf <button type="submit" class="w-full text-left block py-2 text-red-600 font-medium" > Logout </button> </form>                    <a href="{{ route('profile.edit') }}" class="block py-2 text-gray-700 hover:text-[#c9a84c] transition-colors">Profile</a>
                     <a href="{{ route('settings') }}" class="block py-2 text-gray-700 hover:text-[#c9a84c] transition-colors">Settings</a>
                 @else
                     <a href="{{ route('login') }}" class="block py-2 text-[#0f1a3a] font-semibold hover:text-[#c9a84c]">Login / Register</a>

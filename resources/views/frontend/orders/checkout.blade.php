@@ -161,9 +161,20 @@
                             <input type="text" x-model="form.name" required placeholder="Input the real name" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Address Title / Type *</label>
-                            <input type="text" x-model="form.address_type" required placeholder="e.g. Home, Office" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">
+                        Address Title / Type *
+                    </label>
+
+                    <select
+                        x-model="form.address_type"
+                        required
+                        class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                        <option value="">Select address type</option>
+                        <option value="Home">Home</option>
+                        <option value="Office">Office</option>
+                    </select>
+                </div>
                         <div>
                             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1">Contact Number *</label>
                             <input type="text" x-model="form.phone" required placeholder="e.g. +977 9800000000" class="w-full border-gray-300 rounded-lg p-2.5 border focus:ring-indigo-500 focus:border-indigo-500">

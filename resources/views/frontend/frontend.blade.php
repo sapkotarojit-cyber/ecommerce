@@ -18,8 +18,14 @@
                            class="text-sm text-gray-600 hover:text-primary-500 transition-colors">
                             Logout
                         </a>
-                        <form id="logout-form" action="{{ route('logout') }}" method="GET" class="hidden"></form>
-                    @else
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+
+                                <button type="submit">
+                                    Logout
+                                </button>
+                            </form>   
+                                             @else
                         <a href="{{ route('login') }}" class="text-sm text-gray-600 hover:text-primary-500 transition-colors">
                             Login
                         </a>

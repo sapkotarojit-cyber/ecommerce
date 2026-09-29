@@ -192,35 +192,46 @@ class AuthController extends Controller
         return view('frontend.register');
     }
 
-    public function registerSubmit(Request $request)
-    {
-            $validated = $this->validateStrict($request, [
-                'name' => [
-                'required',
-                'string',
-                'min:2',
-                'max:100',
-                'regex:/^[\pL\pM\pN .\'-]+$/u',
-            ],
+   public function registerSubmit(Request $request)
+{
+    Log::info('REGISTRATION REQUEST RECEIVED', [
+        'email' => $request->input('email'),
+        'fields' => array_keys($request->all()),
+    ]);
 
-            'email' => [
-                'required',
-                'string',
-                'email:rfc',
-                'max:254',
-                'unique:users,email',
-            ],
+    $validated = $this->validateStrict($request, [
+    'name' => [
+        'required',
+        'string',
+        'min:2',
+        'max:100',
+        'regex:/^[\pL\pM\pN .\'-]+$/u',
+    ],
 
-            'password' => [
-                'required',
-                'string',
-                'min:8',
-                'max:128',
-                'confirmed',
-                PasswordRule::defaults(),
-            ],
-        ]);
+    'email' => [
+        'required',
+        'string',
+        'email:rfc',
+        'max:254',
+        'unique:users,email',
+    ],
 
+    'password' => [
+        'required',
+        'string',
+        'min:8',
+        'max:128',
+        'confirmed',
+        PasswordRule::defaults(),
+    ],
+
+    'password_confirmation' => [
+        'required',
+        'string',
+        'same:password',
+        'max:128',
+    ],
+]);
         $email = strtolower(trim($validated['email']));
 
         $code = $this->generateVerificationCode();

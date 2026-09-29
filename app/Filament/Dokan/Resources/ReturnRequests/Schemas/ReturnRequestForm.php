@@ -11,6 +11,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 
+
 class ReturnRequestForm
 {
     public static function configure(Schema $schema): Schema
@@ -234,46 +235,40 @@ class ReturnRequestForm
                 Section::make('Return Details')
                     ->schema([
 
-                        Select::make('status')
-                            ->label('Return Status')
-                            ->options([
-                                'requested' => 'Requested',
-                                'approved' => 'Approved',
-                                'rejected' => 'Rejected',
-                                'completed' => 'Completed',
-                            ])
-                            ->required(),
-
-                        Placeholder::make('refund_status')
-                            ->label('Refund Status')
-                            ->content(fn (?ReturnRequest $record) =>
-                                ucfirst(
-                                    $record?->refund_status ?? 'pending'
-                                )
-                            ),
-
-                        Placeholder::make('refund_amount')
-                            ->label('Refund Amount')
-                            ->content(function (?ReturnRequest $record) {
-
-                                if (!$record?->refund_amount) {
-                                    return 'NPR 0.00';
-                                }
-
-                                return 'NPR ' . number_format(
-                                    $record->refund_amount,
-                                    2
-                                );
-                            }),
-
-                        Textarea::make('admin_note')
-                            ->label('Note')
-                            ->rows(4)
-                            ->placeholder(
-                                'Add a note about this return...'
-                            ),
+                Select::make('status')
+                    ->label('Return Status')
+                    ->options([
+                        'requested' => 'Requested',
+                        'approved' => 'Approved',
+                        'rejected' => 'Rejected',
+                        'completed' => 'Completed',
                     ])
-                    ->columns(2)
+                    ->required()
+                    ->native(false),
+
+                Select::make('refund_status')
+                    ->label('Refund Status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'processing' => 'Processing',
+                        'completed' => 'Completed',
+                        'failed' => 'Failed',
+                    ])
+                    ->required()
+                    ->native(false),
+
+                TextInput::make('refund_amount')
+                    ->label('Refund Amount')
+                    ->numeric()
+                    ->minValue(0)
+                    ->prefix('Rs.')
+                    ->nullable(),
+
+                Textarea::make('admin_note')
+                    ->label('Note')
+                    ->rows(4)
+                    ->nullable(),
+                    ]),
             ]);
-    }
+        }
 }

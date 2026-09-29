@@ -158,15 +158,15 @@ class OrderController extends Controller
         }
 
         $orders = Order::query()
-            ->where('user_id', Auth::id())
-            ->where(function ($query) use ($groupId, $firstOrder) {
-                $query->where('payment_group_id', $groupId)
-                    ->orWhereKey($firstOrder->id);
-            })
-            ->where('payment_method', 'esewa')
-            ->where('payment_status', 'pending')
-            ->lockForUpdate()
-            ->get();
+    ->where('user_id', Auth::id())
+    ->where(function ($query) use ($groupId, $firstOrder) {
+        $query->where('payment_group_id', $groupId)
+            ->orWhere('id', $firstOrder->id);
+    })
+    ->where('payment_method', 'esewa')
+    ->where('payment_status', 'pending')
+    ->lockForUpdate()
+    ->get();
 
         if ($orders->isEmpty()) {
             return redirect()->route('orders.index')->with('error', 'No pending eSewa payment was found.');
@@ -366,13 +366,14 @@ class OrderController extends Controller
         }
 
         $orders = Order::query()
-            ->where('user_id', Auth::id())
-            ->where(function ($q) use ($groupId, $firstOrder) {
-                $q->where('payment_group_id', $groupId)->orWhereKey($firstOrder->id);
-            })
-            ->where('payment_method', 'bank')
-            ->where('payment_status', 'pending')
-            ->get();
+    ->where('user_id', Auth::id())
+    ->where(function ($q) use ($groupId, $firstOrder) {
+        $q->where('payment_group_id', $groupId)
+          ->orWhere('id', $firstOrder->id);
+    })
+    ->where('payment_method', 'bank')
+    ->where('payment_status', 'pending')
+    ->get();
 
         $totalAmount = round((float) $orders->sum(fn (Order $item) => (float) $item->total_amount), 2);
         if ($totalAmount <= 0) {
@@ -386,62 +387,131 @@ class OrderController extends Controller
         return view('frontend.payments.bank-pay', compact('masterTracking', 'totalAmount', 'firstOrder'));
     }
 
-    public function bankSuccess(Request $request)
-    {
-        $validated = $this->validateStrict($request, [
-            'payment_receipt' => [
-                'required', 'file', 'mimetypes:image/jpeg,image/png,image/webp,application/pdf',
-                'max:' . (int) env('UPLOAD_PAYMENT_RECEIPT_MAX_KB', 2048),
-            ],
-            'terms' => ['required', 'accepted'],
-        ]);
+ public function bankSuccess(Request $request)
+{
+    $validated = $this->validateStrict($request, [
+        'payment_receipt' => [
+            'required',
+            'file',
+            'mimetypes:image/jpeg,image/png,image/webp,application/pdf',
+            'max:' . (int) env('UPLOAD_PAYMENT_RECEIPT_MAX_KB', 2048),
+        ],
+        'terms' => [
+            'required',
+            'accepted',
+        ],
+    ]);
 
-        $groupId = (string) session('bank_payment_group_id', '');
-        $orderId = (int) session('bank_order_id', 0);
+    $groupId = (string) session('bank_payment_group_id', '');
+    $orderId = (int) session('bank_order_id', 0);
 
-        $order = Order::query()
-            ->where('user_id', Auth::id())
-            ->when($groupId !== '', fn ($q) => $q->where('payment_group_id', $groupId), fn ($q) => $q->whereKey($orderId))
-            ->where('payment_method', 'bank')
-            ->where('payment_status', 'pending')
-            ->firstOrFail();
-
-        $path = $request->file('payment_receipt')->store('payment_receipts', 'private');
-
-        try {
-            DB::transaction(function () use ($order, $path) {
-                $orders = Order::query()
-                    ->where('user_id', Auth::id())
-                    ->where('payment_group_id', $order->payment_group_id ?: $order->id)
-                    ->where('payment_method', 'bank')
-                    ->where('payment_status', 'pending')
-                    ->lockForUpdate()
-                    ->get();
-
-                if ($orders->isEmpty()) {
-                    $orders = collect([$order]);
-                }
-
-                foreach ($orders as $item) {
-                    $item->update([
-                        'payment_status' => 'pending',
-                        'order_status' => 'pending',
-                        'payment_receipt' => $path,
-                    ]);
-                }
-            });
-        } catch (\Throwable $e) {
-            Storage::disk('private')->delete($path);
-            report($e);
-            return redirect()->route('orders.show', $order->id)
-                ->with('error', 'Unable to submit the payment receipt. Please try again.');
-        }
-
-        session()->forget(['bank_order_id', 'bank_payment_group_id']);
-
-        return redirect()->route('orders.show', $order->id)
-            ->with('success', 'Receipt submitted. Your payment will remain pending until an administrator verifies it.');
+    if ($groupId === '' && $orderId <= 0) {
+        return redirect()
+            ->route('orders.index')
+            ->with('error', 'Your payment session has expired. Please try again.');
     }
+
+    $order = Order::query()
+        ->where('user_id', Auth::id())
+        ->when(
+            $groupId !== '',
+            fn ($q) => $q->where('payment_group_id', $groupId),
+            fn ($q) => $q->whereKey($orderId)
+        )
+        ->where('payment_method', 'bank')
+        ->where('payment_status', 'pending')
+        ->first();
+
+    if (! $order) {
+        return redirect()
+            ->route('orders.index')
+            ->with('error', 'No pending bank payment was found.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Store receipt
+    |--------------------------------------------------------------------------
+    |
+    | Use the existing "local" disk instead of a nonexistent "private" disk.
+    | Files are stored outside public/ and are therefore not directly
+    | accessible through a public URL.
+    |
+    */
+
+    try {
+        $path = $request
+            ->file('payment_receipt')
+            ->store('payment_receipts', 'local');
+    } catch (\Throwable $e) {
+        report($e);
+
+        return redirect()
+            ->route('orders.show', $order->id)
+            ->with(
+                'error',
+                'Unable to upload the payment receipt. Please try again.'
+            );
+    }
+
+    try {
+        DB::transaction(function () use ($order, $path) {
+
+            $paymentGroupId = $order->payment_group_id ?: (string) $order->id;
+
+            $orders = Order::query()
+                ->where('user_id', Auth::id())
+                ->where(function ($query) use ($paymentGroupId, $order) {
+                    $query
+                        ->where('payment_group_id', $paymentGroupId)
+                        ->orWhere('id', $order->id);
+                })
+                ->where('payment_method', 'bank')
+                ->where('payment_status', 'pending')
+                ->lockForUpdate()
+                ->get();
+
+            if ($orders->isEmpty()) {
+                throw new \RuntimeException(
+                    'No pending orders found for this payment group.'
+                );
+            }
+
+            foreach ($orders as $item) {
+                $item->update([
+                    'payment_status' => 'pending',
+                    'order_status' => 'pending',
+                    'payment_receipt' => $path,
+                ]);
+            }
+        });
+    } catch (\Throwable $e) {
+
+        // Delete uploaded file if database update fails.
+        Storage::disk('local')->delete($path);
+
+        report($e);
+
+        return redirect()
+            ->route('orders.show', $order->id)
+            ->with(
+                'error',
+                'Unable to submit the payment receipt. Please try again.'
+            );
+    }
+
+    session()->forget([
+        'bank_order_id',
+        'bank_payment_group_id',
+    ]);
+
+    return redirect()
+        ->route('orders.show', $order->id)
+        ->with(
+            'success',
+            'Receipt submitted. Your payment will remain pending until an administrator verifies it.'
+        );
+}
 
     public function bankFailure()
     {
@@ -482,18 +552,19 @@ class OrderController extends Controller
         $tracking = trim($validated['tracking_number']);
 
         $order = Order::with([
-            'order_items.product',
-            'order_items.varient.product',
-            'shipping_address',
-            'dokan',
-        ])
-            ->where(function ($q) use ($tracking) {
-                $q->where('tracking_number', $tracking);
-                if (ctype_digit($tracking)) {
-                    $q->orWhereKey((int) $tracking);
-                }
-            })
-            ->first();
+    'order_items.product',
+    'order_items.varient.product',
+    'shipping_address',
+    'dokan',
+])
+    ->where(function ($q) use ($tracking) {
+        $q->where('tracking_number', $tracking);
+
+        if (ctype_digit($tracking)) {
+            $q->orWhere('id', (int) $tracking);
+        }
+    })
+    ->first();
 
         if (! $order) {
             return back()->withInput()->with('error', 'No order found with that tracking number or ID.');
