@@ -12,10 +12,16 @@ class Order extends Model
         'shipping_address_id',
         'total_amount',
         'status',
+        'order_status',
         'payment_method',
         'payment_status',
         'tracking_number',
         'payment_receipt',
+        'payment_transaction_id',
+    ];
+
+    protected $casts = [
+        'total_amount' => 'decimal:2',
     ];
 
     protected static function boot()
@@ -24,7 +30,32 @@ class Order extends Model
 
         static::creating(function ($order) {
             if (empty($order->tracking_number)) {
-                $order->tracking_number = 'ORD-' . strtoupper(uniqid());
+                $order->tracking_number =
+                    'ORD-' . strtoupper(
+                        uniqid()
+                    );
+            }
+
+            if (empty($order->order_status)) {
+                $order->order_status = 'pending';
+            }
+
+            if (empty($order->status)) {
+                $order->status = 'pending';
+            }
+
+            if (empty($order->payment_status)) {
+                $order->payment_status = 'pending';
+            }
+        });
+
+        static::updating(function ($order) {
+            if ($order->isDirty('order_status')) {
+                $order->status =
+                    $order->order_status;
+            } elseif ($order->isDirty('status')) {
+                $order->order_status =
+                    $order->status;
             }
         });
     }
@@ -41,7 +72,9 @@ class Order extends Model
 
     public function shippingAddress()
     {
-        return $this->belongsTo(ShippingAddress::class);
+        return $this->belongsTo(
+            ShippingAddress::class
+        );
     }
 
     public function shipping_address()
@@ -51,7 +84,9 @@ class Order extends Model
 
     public function orderItems()
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(
+            OrderItem::class
+        );
     }
 
     public function order_items()
@@ -61,6 +96,8 @@ class Order extends Model
 
     public function returnRequests()
     {
-        return $this->hasMany(ReturnRequest::class);
+        return $this->hasMany(
+            ReturnRequest::class
+        );
     }
 }

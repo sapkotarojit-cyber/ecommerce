@@ -1,0 +1,16 @@
+[90m= [39m[34;4mApp\Models\Order[39;24m {#9657
+    [34mid[39m: [35m4[39m,
+    [34mtracking_number[39m: [32m"[39m[32mORD-6ABA3C75400A0[39m[32m"[39m,
+    [34muser_id[39m: [35m2[39m,
+    [34mdokan_id[39m: [35m1[39m,
+    [34mshipping_address_id[39m: [35m1[39m,
+    [34mtotal_amount[39m: [35m71974210.0[39m,
+    [34mstatus[39m: [32m"[39m[32mcompleted[39m[32m"[39m,
+    [34mpayment_method[39m: [32m"[39m[32mbank[39m[32m"[39m,
+    [34mpayment_status[39m: [32m"[39m[32mpaid[39m[32m"[39m,
+    [34mpayment_receipt[39m: [32m"[39m[32mpayment_receipts/HIt7KzJzkkzfLMOrzHWPgSECNdPt8Egg977TWwZk.png[39m[32m"[39m,
+    [34mpayment_transaction_id[39m: [36mnull[39m,
+    [34morder_status[39m: [32m"[39m[32mcompleted[39m[32m"[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-09-28 10:07:49[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-09-28 10:08:26[39m[32m"[39m,
+  }

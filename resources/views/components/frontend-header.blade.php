@@ -21,9 +21,20 @@
     <!-- Main Navigation Header -->
     <div class="container mx-auto px-4 py-4">
         <div class="flex items-center justify-between gap-4">
-            <!-- Brand Logo -->
- <a href="{{ route('home') }}" class="flex items-center h-16 md:h-20 py-1">
-    <img src="{{ asset('images/logo2.png') }}" alt="Empire Innovation" class="h-full w-auto object-contain">
+ <!-- Brand Logo -->
+<a href="{{ route('home') }}"
+   class="flex items-center shrink-0
+          w-[100px] h-[42px]
+          sm:w-[120px] sm:h-[48px]
+          md:w-[150px] md:h-[60px]
+          overflow-hidden">
+
+    <img
+        src="{{ asset('images/logo2.png') }}"
+        alt="Empire Innovation"
+        class="!w-full !h-full !max-w-full !max-h-full object-contain"
+    >
+
 </a>
             <!-- Search Bar - Desktop -->
             <div class="hidden md:block flex-1 max-w-xl">
@@ -42,19 +53,23 @@
                 </form>
             </div>
 
-            <!-- Action Icons -->
-            <div class="flex items-center gap-4">
-                <!-- Cart -->
-                   <a href="{{ route('cart.index') }}" class="relative text-gray-700 hover:text-indigo-600 flex items-center">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                    </svg>
-                    @if(isset($globalCartCount) && $globalCartCount > 0)
-                        <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                            {{ $globalCartCount }}
-                        </span>
-                    @endif
-                </a>
+          <!-- Action Icons -->
+        <div class="flex items-center gap-4">
+
+            <!-- Cart -->
+            <a href="{{ route('cart.index') }}"
+            class="relative text-gray-700 hover:text-indigo-600 flex items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke="currentColor" stroke-width="2"
+                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                </svg>
+
+                @if(isset($globalCartCount) && $globalCartCount > 0)
+                    <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {{ $globalCartCount }}
+                    </span>
+                @endif
+            </a>
 
              
 
@@ -90,10 +105,15 @@
                 @endauth
 
                 <!-- Mobile Menu Button -->
-                <button id="mobile-menu-button" class="md:hidden p-2 rounded-lg hover:bg-gray-100">
-                    <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                <button type="button"
+                        onclick="document.getElementById('mobile-menu').classList.toggle('hidden')"
+                        class="md:hidden p-2 rounded-lg hover:bg-gray-100">
+
+                    <svg class="w-7 h-7 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke="currentColor" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
+
                 </button>
             </div>
         </div>

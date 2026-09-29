@@ -16,14 +16,14 @@ class EditOrder extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $this->oldOrderStatus = $this->record->status;
+        $this->oldOrderStatus = $this->record->order_status;
 
         return $data;
     }
 
     protected function afterSave(): void
     {
-        $newStatus = $this->record->fresh()->status;
+        $newStatus = $this->record->fresh()->order_status;
 
         /*
          * Only send an email when the order status

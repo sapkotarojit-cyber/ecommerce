@@ -173,7 +173,6 @@
 │   │   ├── Category.php
 │   │   ├── Dokan.php
 │   │   ├── Dokan.php.save
-│   │   ├── .gitignore
 │   │   ├── OrderItem.php
 │   │   ├── Order.php
 │   │   ├── Product.php
@@ -195,39 +194,11 @@
 ├── boost.json
 ├── bootstrap
 │   ├── app.php
+│   ├── cache
+│   │   ├── packages.php
+│   │   └── services.php
 │   └── providers.php
 ├── category?-
-├── .claude
-│   └── skills
-│       ├── laravel-best-practices
-│       │   ├── rules
-│       │   │   ├── advanced-queries.md
-│       │   │   ├── architecture.md
-│       │   │   ├── blade-views.md
-│       │   │   ├── caching.md
-│       │   │   ├── collections.md
-│       │   │   ├── config.md
-│       │   │   ├── db-performance.md
-│       │   │   ├── eloquent.md
-│       │   │   ├── error-handling.md
-│       │   │   ├── events-notifications.md
-│       │   │   ├── http-client.md
-│       │   │   ├── mail.md
-│       │   │   ├── migrations.md
-│       │   │   ├── queue-jobs.md
-│       │   │   ├── routing.md
-│       │   │   ├── scheduling.md
-│       │   │   ├── security.md
-│       │   │   ├── style.md
-│       │   │   ├── testing.md
-│       │   │   └── validation.md
-│       │   └── SKILL.md
-│       ├── pest-testing
-│       │   └── SKILL.md
-│       ├── socialite-development
-│       │   └── SKILL.md
-│       └── tailwindcss-development
-│           └── SKILL.md
 ├── CLAUDE.md
 ├── composer.json
 ├── composer.lock
@@ -240,12 +211,12 @@
 │   ├── logging.php
 │   ├── mail.php
 │   ├── queue.php
+│   ├── security.php
 │   ├── services.php
 │   └── session.php
 ├── database
 │   ├── factories
 │   │   └── UserFactory.php
-│   ├── .gitignore
 │   ├── migrations
 │   │   ├── 0001_01_01_000000_create_users_table.php
 │   │   ├── 0001_01_01_000001_create_cache_table.php
@@ -283,6 +254,8 @@
 │   │   ├── 2026_09_25_165231_change_user_id_delete_behavior_on_dokans_table.php
 │   │   ├── 2026_09_25_165610_change_dokan_user_foreign_key_delete_behavior.php
 │   │   ├── 2026_09_25_170353_fix_dokans_user_id_foreign_key.php
+│   │   ├── 2026_09_25_185801_add_tracking_number_and_payment_receipt_to_orders_table.php
+│   │   ├── 2026_09_25_190852_update_payment_method_on_orders_table.php
 │   │   └── migrations
 │   │       ├── 0001_01_01_000000_create_users_table.php
 │   │       ├── 0001_01_01_000001_create_cache_table.php
@@ -298,16 +271,10 @@
 │   └── seeders
 │       └── DatabaseSeeder.php
 ├── dir
-├── .editorconfig
-├── .env
-├── .env.example
 ├── ->first()->images;
-├── .gitattributes
-├── .gitignore
 ├── 'Invalid
 ├── invalidate()
 ├── logout()
-├── .mcp.json
 ├── name
 ├── package.json
 ├── package-lock.json
@@ -336,8 +303,6 @@
 │   │               ├── inter-latin-ext-wght-normal-HA22NDSG.woff2
 │   │               ├── inter-latin-wght-normal-NRMW37G5.woff2
 │   │               └── inter-vietnamese-wght-normal-CE5GGD3W.woff2
-│   ├── hot
-│   ├── .htaccess
 │   ├── images
 │   │   ├── logo2.png
 │   │   ├── logo3.png
@@ -411,9 +376,7 @@
 │       │   └── frontend-layout.blade.php
 │       ├── emails
 │       │   ├── order-placed.blade.php
-│       │   ├── Orders
-│       │   │   ├── placed.blade.php
-│       │   │   └── status-changed.blade.php
+│       │   ├── order-status-changed.blade.php
 │       │   └── verification_code.blade.php
 │       ├── filament
 │       │   ├── dokan
@@ -483,4 +446,4 @@
 ├── validate([
 └── vite.config.js
 
-138 directories, 346 files
+131 directories, 316 files

@@ -19,36 +19,94 @@ class ProductForm
     {
         return $schema->components([
 
+            /*
+            |--------------------------------------------------------------------------
+            | CATEGORY
+            |--------------------------------------------------------------------------
+            */
+
             Select::make('category_id')
                 ->label('Category')
-                ->options(
-                    Category::query()
+
+                ->options(function () {
+                    return Category::query()
                         ->where('is_active', true)
+                        ->orderBy('name')
                         ->pluck('name', 'id')
-                        ->toArray()
-                )
+                        ->toArray();
+                })
+
                 ->searchable()
                 ->preload()
                 ->required()
+
+                /*
+                 * Form shown when vendor clicks "Create option"
+                 */
                 ->createOptionForm([
+
                     TextInput::make('name')
                         ->label('Category Name')
                         ->required()
-                        ->unique('categories', 'name'),
+                        ->maxLength(255)
+                        ->unique(
+                            table: 'categories',
+                            column: 'name'
+                        ),
 
                     TextInput::make('slug')
                         ->label('Category Slug')
                         ->required()
-                        ->unique('categories', 'slug'),
-                ]),
+                        ->maxLength(255)
+                        ->unique(
+                            table: 'categories',
+                            column: 'slug'
+                        ),
+
+                ])
+
+                /*
+                 * Actually create the category.
+                 *
+                 * This is required by Filament when
+                 * createOptionForm() is used.
+                 */
+                ->createOptionUsing(function (array $data): int {
+
+                    $category = Category::create([
+                        'name' => $data['name'],
+                        'slug' => $data['slug'],
+                        'is_active' => true,
+                    ]);
+
+                    return (int) $category->getKey();
+                }),
+
+            /*
+            |--------------------------------------------------------------------------
+            | PRODUCT TITLE
+            |--------------------------------------------------------------------------
+            */
 
             TextInput::make('title')
                 ->required()
                 ->maxLength(255),
 
+            /*
+            |--------------------------------------------------------------------------
+            | DESCRIPTION
+            |--------------------------------------------------------------------------
+            */
+
             Textarea::make('description')
                 ->required()
                 ->columnSpanFull(),
+
+            /*
+            |--------------------------------------------------------------------------
+            | PRODUCT VARIANTS
+            |--------------------------------------------------------------------------
+            */
 
             Repeater::make('varients')
                 ->relationship('varients')
@@ -60,18 +118,24 @@ class ProductForm
                         ->maxLength(255),
 
                     TextInput::make('price')
+                        ->label('Price')
                         ->numeric()
+                        ->minValue(0)
                         ->prefix('Rs.')
                         ->required(),
 
                     TextInput::make('discount')
+                        ->label('Discount')
                         ->numeric()
+                        ->minValue(0)
+                        ->maxValue(100)
                         ->default(0)
                         ->suffix('%'),
 
                     TextInput::make('qty')
                         ->label('Stock Quantity')
                         ->numeric()
+                        ->minValue(0)
                         ->required()
                         ->default(1),
 
@@ -91,8 +155,15 @@ class ProductForm
                 ->required()
                 ->label('Product Variants'),
 
+            /*
+            |--------------------------------------------------------------------------
+            | DOKAN
+            |--------------------------------------------------------------------------
+            */
+
             Hidden::make('dokan_id')
                 ->default(function () {
+
                     $user = Filament::auth()->user()
                         ?? auth()->guard('dokan')->user();
 
@@ -100,12 +171,15 @@ class ProductForm
                         return null;
                     }
 
-                    return $user instanceof Dokan
-                        ? $user->id
-                        : (
-                            Dokan::where('user_id', $user->id)->value('id')
-                            ?? $user->dokan_id
-                        );
+                    if ($user instanceof Dokan) {
+                        return $user->id;
+                    }
+
+                    return Dokan::where(
+                        'user_id',
+                        $user->id
+                    )->value('id')
+                        ?? $user->dokan_id;
                 }),
 
         ]);

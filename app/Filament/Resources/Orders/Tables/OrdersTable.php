@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Orders\Tables;
 
 use App\Models\Order;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -36,7 +37,6 @@ class OrdersTable
 
                         $images = $variant->images;
 
-                        // If images are stored as JSON/string
                         if (is_string($images)) {
                             $decoded = json_decode($images, true);
 
@@ -85,11 +85,26 @@ class OrdersTable
                     ->numeric()
                     ->sortable(),
 
-                // Status
+                // Order Status
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
                     ->searchable(),
+
+                // Payment Receipt
+                TextColumn::make('payment_receipt')
+                    ->label('Receipt')
+                    ->formatStateUsing(
+                        fn ($state) => $state
+                            ? 'Uploaded'
+                            : 'Not Uploaded'
+                    )
+                    ->badge()
+                    ->color(
+                        fn ($state) => $state
+                            ? 'success'
+                            : 'gray'
+                    ),
 
                 // Payment Method
                 TextColumn::make('payment_method')
@@ -100,6 +115,11 @@ class OrdersTable
                 TextColumn::make('payment_status')
                     ->label('Payment Status')
                     ->badge()
+                    ->color(fn ($state) => match ($state) {
+                        'paid' => 'success',
+                        'failed' => 'danger',
+                        default => 'warning',
+                    })
                     ->searchable(),
 
                 TextColumn::make('created_at')
@@ -118,6 +138,77 @@ class OrdersTable
             ])
 
             ->recordActions([
+
+                /*
+                 * VIEW PAYMENT RECEIPT
+                 */
+                Action::make('viewReceipt')
+                    ->label('Receipt')
+                    ->icon('heroicon-o-document-magnifying-glass')
+                    ->color('info')
+                    ->visible(fn (Order $record) =>
+                        filled($record->payment_receipt)
+                    )
+                    ->url(fn (Order $record) =>
+                        asset('storage/' . $record->payment_receipt)
+                    )
+                    ->openUrlInNewTab(),
+
+                /*
+                 * APPROVE PAYMENT
+                 */
+                Action::make('approvePayment')
+                    ->label('Approve Payment')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Approve Payment')
+                    ->modalDescription(
+                        'Are you sure you want to approve this payment? The order will be marked as paid and confirmed.'
+                    )
+                    ->visible(fn (Order $record) =>
+                        $record->payment_status === 'pending'
+                        && filled($record->payment_receipt)
+                    )
+                    ->action(function (Order $record) {
+
+                        $record->update([
+                            'payment_status' => 'paid',
+                            'order_status' => 'confirmed',
+                        ]);
+                    })
+                    ->successNotificationTitle(
+                        'Payment approved successfully'
+                    ),
+
+                /*
+                 * REJECT PAYMENT
+                 */
+                Action::make('rejectPayment')
+                    ->label('Reject Payment')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Reject Payment')
+                    ->modalDescription(
+                        'Are you sure you want to reject this payment?'
+                    )
+                    ->visible(fn (Order $record) =>
+                        $record->payment_status === 'pending'
+                    )
+                    ->action(function (Order $record) {
+
+                        $record->update([
+                            'payment_status' => 'failed',
+                        ]);
+                    })
+                    ->successNotificationTitle(
+                        'Payment rejected'
+                    ),
+
+                /*
+                 * NORMAL EDIT
+                 */
                 EditAction::make(),
             ])
 

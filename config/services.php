@@ -40,22 +40,22 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
-    'esewa' => [
-    'merchant_code' => env('ESEWA_MERCHANT_CODE', 'EPAYTEST'),
-    'secret_key' => env('ESEWA_SECRET_KEY', '8gBm/:&EnhH.1/q'),
-    'url' => env('ESEWA_URL', 'https://rc-epay.esewa.com.np/api/epay/main/v2/form'),
-    ],
-
+   'esewa' => [
+    'merchant_code' => env('ESEWA_MERCHANT_CODE'),
+    'secret_key' => env('ESEWA_SECRET_KEY'),
+    'url' => env(
+        'ESEWA_URL',
+        'https://rc-epay.esewa.com.np/api/epay/main/v2/form'
+    ),
+    'status_url' => env(
+        'ESEWA_STATUS_URL',
+        'https://rc.esewa.com.np/api/epay/transaction/status/'
+    ),
+],
     'bank' => [
             'url' => env('BANK_URL', '#'),
         ],
 
 ];
 
-// FACEBOOK_CLIENT_ID=945860118562238
-// FACEBOOK_CLIENT_SECRET=6d290b0180cf236ce35e592a81af219f
-// FACEBOOK_REDIRECT_URI="http://localhost:8000/auth/facebook/callback"
 
-// GOOGLE_CLIENT_ID=116565645897-s13guq26f95f8t8asicecdkhemo60hvk.apps.googleusercontent.com
-// GOOGLE_CLIENT_SECRET=OCSPX-GBTmw1mYSG20RvYG1e1OG0gkh1Uu
-// GOOGLE_REDIRECT_URI="http://localhost:8000/auth/google/callback"
