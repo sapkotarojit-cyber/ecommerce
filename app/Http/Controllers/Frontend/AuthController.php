@@ -270,7 +270,7 @@ class AuthController extends Controller
 
     public function verifyCode(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'code' => [
                 'required',
                 'string',
@@ -428,7 +428,7 @@ class AuthController extends Controller
 
     public function sendResetLink(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'email' => [
                 'required',
                 'string',
@@ -483,7 +483,7 @@ class AuthController extends Controller
         /*
          * Strict query-string validation
          */
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'email' => [
                 'required',
                 'string',
@@ -508,7 +508,7 @@ class AuthController extends Controller
 
     public function resetPassword(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'token' => [
                 'required',
                 'string',
