@@ -15,12 +15,12 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
-        $request->validate([
+        $this->validateStrict($request, [
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        if (Auth::guard('dokan')->attempt($request->only('email', 'password'))) {
+        if (Auth::guard('dokan')->attempt($validated)) {
             return redirect()->intended('/dokan/dashboard');
         }
 

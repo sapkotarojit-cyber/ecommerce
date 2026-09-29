@@ -60,7 +60,7 @@ class CartController extends Controller
      */
     public function add(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'varient_id' => [
                 'bail',
                 'required',
@@ -157,7 +157,7 @@ class CartController extends Controller
      */
     public function buyNow(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'varient_id' => [
                 'bail',
                 'required',
@@ -240,7 +240,7 @@ class CartController extends Controller
      */
     public function update(Request $request, int $id)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'qty' => [
                 'bail',
                 'required',

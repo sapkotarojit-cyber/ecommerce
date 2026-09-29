@@ -7,6 +7,8 @@ use App\Models\ShippingAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class ShippingAddressController extends Controller
 {
@@ -40,7 +42,7 @@ class ShippingAddressController extends Controller
     public function store(Request $request)
     {
         $validated =
-            $request->validate([
+            $this->validateStrict($request, [
                 'name' => [
                     'required',
                     'string',
@@ -54,7 +56,6 @@ class ShippingAddressController extends Controller
                     'string',
                     'min:7',
                     'max:20',
-                    'regex:/^[0-9+\-\s()]+$/',
                 ],
 
                 'region' => [
@@ -204,7 +205,7 @@ class ShippingAddressController extends Controller
         Request $request
     ) {
         $validated =
-            $request->validate([
+            $this->validateStrict($request, [
                 'name' => [
                     'required',
                     'string',
@@ -327,7 +328,7 @@ class ShippingAddressController extends Controller
         );
 
         $validated =
-            $request->validate([
+            $this->validateStrict($request, [
                 'name' => [
                     'required',
                     'string',

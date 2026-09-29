@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -259,6 +260,15 @@ class OrderController extends Controller
 
         $groupId = (string) session('esewa_payment_group_id', '');
         $orderId = (int) session('esewa_order_id', 0);
+        $sessionTransactionUuid = (string) session('esewa_transaction_uuid', '');
+
+        if (
+            $sessionTransactionUuid === '' ||
+            ! hash_equals($sessionTransactionUuid, $uuid)
+        ) {
+            return redirect()->route('orders.index')
+                ->with('error', 'eSewa transaction could not be matched to this payment session.');
+        }
         $order = Order::query()
             ->where('user_id', Auth::id())
             ->when($groupId !== '', fn ($q) => $q->where('payment_group_id', $groupId), fn ($q) => $q->whereKey($orderId))
@@ -268,6 +278,14 @@ class OrderController extends Controller
 
         if (! $order) {
             return redirect()->route('orders.index')->with('error', 'Payment session expired or order was already processed.');
+        }
+
+        if (
+            $order->payment_transaction_id === null ||
+            ! hash_equals((string) $order->payment_transaction_id, $uuid)
+        ) {
+            return redirect()->route('orders.index')
+                ->with('error', 'eSewa transaction could not be matched to this order.');
         }
 
         $orders = Order::query()
@@ -515,36 +533,180 @@ class OrderController extends Controller
 
     private function decodeEsewaResponse(Request $request): ?array
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Strict eSewa response schema
+        |--------------------------------------------------------------------------
+        |
+        | eSewa sends the browser response as a Base64-encoded JSON payload.
+        | Do not trust the decoded JSON merely because it is valid JSON.
+        |
+        */
+
+        $allowed = [
+            'transaction_code',
+            'status',
+            'total_amount',
+            'transaction_uuid',
+            'product_code',
+            'signed_field_names',
+            'signature',
+        ];
+
+        $rules = [
+            'transaction_code' => [
+                'required',
+                'string',
+                'max:100',
+                'regex:/^[A-Za-z0-9._-]+$/',
+            ],
+
+            'status' => [
+                'required',
+                'string',
+                'max:30',
+                'in:COMPLETE,PENDING,FAILED,CANCELED,FULL_REFUND,PARTIAL_REFUND,AMBIGUOUS,NOT_FOUND',
+            ],
+
+            'total_amount' => [
+                'required',
+                'numeric',
+                'min:0',
+                'max:999999999.99',
+            ],
+
+            'transaction_uuid' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+                'regex:/^[A-Za-z0-9-]+$/',
+            ],
+
+            'product_code' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+                'regex:/^[A-Za-z0-9_-]+$/',
+            ],
+
+            'signed_field_names' => [
+                'required',
+                'string',
+                'max:500',
+                'regex:/^[A-Za-z0-9_,]+$/',
+            ],
+
+            'signature' => [
+                'required',
+                'string',
+                'max:512',
+                'regex:/^[A-Za-z0-9+\/=_-]+$/',
+            ],
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Base64 encoded response
+        |--------------------------------------------------------------------------
+        */
+
         $payload = $request->input('data');
 
         if (is_string($payload) && $payload !== '') {
+            if (strlen($payload) > 32768) {
+                return null;
+            }
+
             $decoded = base64_decode($payload, true);
+
             if ($decoded === false || strlen($decoded) > 16384) {
                 return null;
             }
 
             $json = json_decode($decoded, true);
-            return is_array($json) ? $json : null;
+
+            if (
+                ! is_array($json) ||
+                array_is_list($json)
+            ) {
+                return null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Reject unknown decoded JSON fields
+            |--------------------------------------------------------------------------
+            */
+
+            $unexpected = array_diff(
+                array_keys($json),
+                $allowed
+            );
+
+            if ($unexpected !== []) {
+                return null;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate decoded JSON against strict schema
+            |--------------------------------------------------------------------------
+            */
+
+            $validator = Validator::make(
+                $json,
+                $rules
+            );
+
+            if ($validator->fails()) {
+                return null;
+            }
+
+            return $validator->validated();
         }
 
-        $allowed = [
-            'status', 'signature', 'transaction_code', 'total_amount',
-            'transaction_uuid', 'product_code', 'signed_field_names',
-        ];
+        /*
+        |--------------------------------------------------------------------------
+        | Direct/form response
+        |--------------------------------------------------------------------------
+        */
 
-        $unexpected = array_diff(array_keys($request->all()), array_merge($allowed, ['data', '_token']));
+        $unexpected = array_diff(
+            array_keys($request->all()),
+            array_merge(
+                $allowed,
+                ['data', '_token']
+            )
+        );
+
         if ($unexpected !== []) {
             return null;
         }
 
         $data = [];
+
         foreach ($allowed as $key) {
             if ($request->has($key)) {
                 $data[$key] = $request->input($key);
             }
         }
 
-        return $data ?: null;
+        if ($data === []) {
+            return null;
+        }
+
+        $validator = Validator::make(
+            $data,
+            $rules
+        );
+
+        if ($validator->fails()) {
+            return null;
+        }
+
+        return $validator->validated();
     }
 
     private function verifyEsewaTransaction(string $uuid, float $amount, string $productCode): array
@@ -575,13 +737,24 @@ class OrderController extends Controller
             $responseCode = (string) ($body['product_code'] ?? $body['scd'] ?? '');
             $responseAmount = $body['total_amount'] ?? $body['totalAmount'] ?? null;
 
-            $verified = $status === 'COMPLETE'
-                && ($responseUuid === '' || hash_equals($uuid, $responseUuid))
-                && ($responseCode === '' || hash_equals($productCode, $responseCode))
-                && is_numeric($responseAmount)
-                && abs((float) $responseAmount - $amount) <= 0.009;
+            if (
+                $status !== 'COMPLETE' ||
+                $responseUuid === '' ||
+                $responseCode === '' ||
+                ! is_numeric($responseAmount)
+            ) {
+                return ['verified' => false];
+            }
 
-            return ['verified' => $verified, 'reference' => $body['ref_id'] ?? $body['refId'] ?? null];
+            $verified =
+                hash_equals($uuid, $responseUuid) &&
+                hash_equals($productCode, $responseCode) &&
+                abs((float) $responseAmount - $amount) <= 0.009;
+
+            return [
+                'verified' => $verified,
+                'reference' => $body['ref_id'] ?? $body['refId'] ?? null,
+            ];
         } catch (\Throwable $e) {
             report($e);
             return ['verified' => false];

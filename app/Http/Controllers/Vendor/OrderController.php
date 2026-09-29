@@ -17,7 +17,7 @@ class OrderController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'order_status' => [
                 'required',
                 'string',

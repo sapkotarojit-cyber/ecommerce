@@ -50,7 +50,7 @@ class PageController extends Controller
         | Strict input validation
         |--------------------------------------------------------------------------
         */
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'category' => [
                 'nullable',
                 'string',
@@ -280,7 +280,7 @@ class PageController extends Controller
         | Strict vendor registration validation
         |--------------------------------------------------------------------------
         */
-        $data = $request->validate([
+        $data = $this->validateStrict($request, [
 
             /*
              * Company / applicant information

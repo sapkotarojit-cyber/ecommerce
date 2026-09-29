@@ -73,7 +73,7 @@ class ReturnRequestController extends Controller
         Request $request,
         $id
     ) {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'reason' => [
                 'required',
                 'string',

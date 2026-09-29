@@ -27,7 +27,7 @@ class ProfileController extends Controller
         $user = Auth::user();
 
         $validated =
-            $request->validate([
+            $this->validateStrict($request, [
                 'name' => [
                     'required',
                     'string',
@@ -82,7 +82,7 @@ class ProfileController extends Controller
         Request $request
     ) {
         $validated =
-            $request->validate([
+            $this->validateStrict($request, [
                 'current_password' => [
                     'required',
                     'string',

@@ -21,7 +21,7 @@ class CheckoutController extends Controller
      */
     public function postCheckoutSelected(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'selected_items' => [
                 'required',
                 'array',
@@ -210,7 +210,7 @@ class CheckoutController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $validated = $this->validateStrict($request, [
             'shipping_address_id' => [
                 'required',
                 'integer',

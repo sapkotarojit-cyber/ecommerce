@@ -18,6 +18,7 @@ class Order extends Model
         'tracking_number',
         'payment_receipt',
         'payment_transaction_id',
+        'payment_group_id',
     ];
 
     protected $casts = [
