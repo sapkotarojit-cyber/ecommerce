@@ -47,8 +47,8 @@ class AuthController extends Controller
 
    public function loginSubmit(Request $request)
 {
-    $validated = $request->validate([
-        'email' => [
+        $validated = $this->validateStrict($request, [  
+            'email' => [
             'required',
             'string',
             'email:rfc',
@@ -194,8 +194,8 @@ class AuthController extends Controller
 
     public function registerSubmit(Request $request)
     {
-        $validated = $request->validate([
-            'name' => [
+            $validated = $this->validateStrict($request, [
+                'name' => [
                 'required',
                 'string',
                 'min:2',

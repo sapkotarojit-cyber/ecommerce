@@ -94,6 +94,31 @@ class AdaptiveRateLimit
 
         /*
          * ---------------------------------------------------------
+         * Authenticated account identifier
+         * ---------------------------------------------------------
+         *
+         * Sensitive authenticated endpoints usually do not submit an
+         * email address. Bind their account bucket to the authenticated
+         * principal so the account limit is actually enforced.
+         */
+        foreach (['web', 'dokan', 'admin'] as $guard) {
+            $guardUser = auth()->guard($guard)->user();
+
+            if ($guardUser && $guardUser->getAuthIdentifier() !== null) {
+                $identifiers[] = [
+                    'kind' => 'account',
+                    'value' => hash(
+                        'sha256',
+                        $guard . ':user:' . (string) $guardUser->getAuthIdentifier()
+                    ),
+                ];
+
+                break;
+            }
+        }
+
+        /*
+         * ---------------------------------------------------------
          * Email/account identifier
          * ---------------------------------------------------------
          */
