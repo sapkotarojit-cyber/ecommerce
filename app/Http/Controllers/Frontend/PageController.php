@@ -14,79 +14,181 @@ use Illuminate\Support\Facades\Mail;
 
 class PageController extends Controller
 {
+    /**
+     * Home page
+     */
     public function home()
     {
         return view('frontend.home', [
-            'products' => Product::latest()->get()
+            'products' => Product::latest()->get(),
         ]);
     }
 
+    /**
+     * Support page
+     */
     public function support()
     {
         return view('frontend.support');
     }
 
+    /**
+     * About page
+     */
     public function about()
     {
         return view('frontend.about');
     }
 
+    /**
+     * Product listing
+     */
     public function products(Request $request)
     {
-        $query = Product::with(['dokan', 'varients']);
+        /*
+        |--------------------------------------------------------------------------
+        | Strict input validation
+        |--------------------------------------------------------------------------
+        */
+        $validated = $this->validateStrict($request, [
+            'category' => [
+                'nullable',
+                'string',
+                'max:100',
+                'regex:/^[A-Za-z0-9_\- ]+$/',
+            ],
 
-        if ($request->filled('category')) {
-            $value = $request->category;
+            'min_price' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:999999999.99',
+            ],
+
+            'max_price' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'max:999999999.99',
+                'gte:min_price',
+            ],
+
+            'sort' => [
+                'nullable',
+                'string',
+                'in:price_asc,price_desc',
+            ],
+        ]);
+
+        $query = Product::with([
+            'dokan',
+            'varients',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Category filter
+        |--------------------------------------------------------------------------
+        */
+        if (!empty($validated['category'])) {
+
+            $value = $validated['category'];
 
             $query->where(function ($q) use ($value) {
+
+                /*
+                 * Keep compatibility with the existing legacy category
+                 * column if it exists in the products table.
+                 */
                 $q->where('category', $value);
 
-                if (is_numeric($value)) {
-                    $q->orWhere('category_id', $value);
+                /*
+                 * Numeric category IDs
+                 */
+                if (ctype_digit($value)) {
+                    $q->orWhere('category_id', (int) $value);
                 }
 
+                /*
+                 * Category relationship
+                 */
                 $q->orWhereHas('category', function ($cat) use ($value) {
                     $cat->where('slug', $value)
-                        ->orWhere('id', $value)
                         ->orWhere('name', $value);
+
+                    if (ctype_digit($value)) {
+                        $cat->orWhere('id', (int) $value);
+                    }
                 });
             });
         }
 
-        if ($request->filled('min_price') || $request->filled('max_price')) {
-            $query->whereHas('varients', function ($q) use ($request) {
-                if ($request->filled('min_price')) {
-                    $q->where('price', '>=', $request->min_price);
+        /*
+        |--------------------------------------------------------------------------
+        | Price filter
+        |--------------------------------------------------------------------------
+        */
+        if (
+            array_key_exists('min_price', $validated)
+            || array_key_exists('max_price', $validated)
+        ) {
+            $minPrice = $validated['min_price'] ?? null;
+            $maxPrice = $validated['max_price'] ?? null;
+
+            $query->whereHas('varients', function ($q) use (
+                $minPrice,
+                $maxPrice
+            ) {
+
+                if ($minPrice !== null) {
+                    $q->where('price', '>=', $minPrice);
                 }
 
-                if ($request->filled('max_price')) {
-                    $q->where('price', '<=', $request->max_price);
+                if ($maxPrice !== null) {
+                    $q->where('price', '<=', $maxPrice);
                 }
             });
         }
 
-        if ($request->sort === 'price_asc') {
-            $query->join(
-                'product_varients',
-                'products.id',
-                '=',
-                'product_varients.product_id'
-            )->orderBy('product_varients.price')
-             ->select('products.*');
+        /*
+        |--------------------------------------------------------------------------
+        | Sorting
+        |--------------------------------------------------------------------------
+        */
+        $sort = $validated['sort'] ?? null;
 
-        } elseif ($request->sort === 'price_desc') {
+        if ($sort === 'price_asc') {
+
             $query->join(
                 'product_varients',
                 'products.id',
                 '=',
                 'product_varients.product_id'
-            )->orderByDesc('product_varients.price')
-             ->select('products.*');
+            )
+                ->orderBy('product_varients.price')
+                ->select('products.*');
+
+        } elseif ($sort === 'price_desc') {
+
+            $query->join(
+                'product_varients',
+                'products.id',
+                '=',
+                'product_varients.product_id'
+            )
+                ->orderByDesc('product_varients.price')
+                ->select('products.*');
 
         } else {
+
             $query->latest('products.created_at');
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Categories
+        |--------------------------------------------------------------------------
+        */
         $categories = class_exists(Category::class)
             ? Category::all()
             : Product::whereNotNull('category')
@@ -94,20 +196,58 @@ class PageController extends Controller
                 ->distinct()
                 ->pluck('category');
 
-        $products = $query->paginate(12)->withQueryString();
+        /*
+        |--------------------------------------------------------------------------
+        | Paginated products
+        |--------------------------------------------------------------------------
+        */
+        $products = $query
+            ->paginate(12)
+            ->withQueryString();
 
-        return view('frontend.product.index', compact('products', 'categories'));
+        return view(
+            'frontend.product.index',
+            compact('products', 'categories')
+        );
     }
 
+    /**
+     * Product details
+     */
     public function product($id)
     {
-        $product = Product::with(['dokan', 'varients'])->findOrFail($id);
+        /*
+        |--------------------------------------------------------------------------
+        | Strict product ID validation
+        |--------------------------------------------------------------------------
+        */
+        if (!ctype_digit((string) $id) || (int) $id < 1) {
+            abort(404);
+        }
 
-        $relatedProducts = Product::with(['dokan', 'varients'])
+        $productId = (int) $id;
+
+        $product = Product::with([
+            'dokan',
+            'varients',
+        ])->findOrFail($productId);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Related products
+        |--------------------------------------------------------------------------
+        */
+        $relatedProducts = Product::with([
+            'dokan',
+            'varients',
+        ])
             ->where('id', '!=', $product->id)
             ->when(
                 $product->category,
-                fn ($q) => $q->where('category', $product->category)
+                fn ($q) => $q->where(
+                    'category',
+                    $product->category
+                )
             )
             ->latest()
             ->take(4)
@@ -115,98 +255,280 @@ class PageController extends Controller
 
         return view(
             'frontend.product.show',
-            compact('product', 'relatedProducts')
+            compact(
+                'product',
+                'relatedProducts'
+            )
         );
     }
 
+    /**
+     * Vendor registration page
+     */
     public function dokan_registration()
     {
         return view('frontend.dokan');
     }
 
+    /**
+     * Vendor registration submit
+     */
     public function dokan_registration_submit(Request $request)
     {
-        $data = $request->validate([
-            'company_name'        => 'required|string|max:255',
-            'name'                => 'required|string|max:255',
-            'email'               => 'required|email|max:255',
-            'reg_no'              => 'required|string|max:255',
-            'contact_number'      => 'required|string|max:20',
+        /*
+        |--------------------------------------------------------------------------
+        | Strict vendor registration validation
+        |--------------------------------------------------------------------------
+        */
+        $data = $this->validateStrict($request, [
 
-            'business_location'   => 'required|string|max:255',
-            'business_address'    => 'required|string|max:1000',
+            /*
+             * Company / applicant information
+             */
+            'company_name' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
 
-            'business_reg_no'     => 'required|string|max:255',
-            'pan_no'              => 'required|string|max:255',
-            'business_document'   => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'name' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
 
-            'bank_name'           => 'required|string|max:255',
-            'bank_account_name'   => 'required|string|max:255',
-            'bank_account_number' => 'required|string|max:255',
-            'bank_branch'         => 'required|string|max:255',
-            'bank_document'       => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
+            'email' => [
+                'required',
+                'string',
+                'email:rfc',
+                'max:255',
+            ],
 
-            'logo'                => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'reg_no' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+                'regex:/^[A-Za-z0-9\-\/]+$/',
+            ],
 
-            'terms'               => 'required|accepted',
+            'contact_number' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^[0-9+\-\s()]+$/',
+            ],
+
+            /*
+             * Business address
+             */
+            'business_location' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'business_address' => [
+                'required',
+                'string',
+                'min:5',
+                'max:1000',
+            ],
+
+            /*
+             * Business registration
+             */
+            'business_reg_no' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+                'regex:/^[A-Za-z0-9\-\/]+$/',
+            ],
+
+            'pan_no' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+                'regex:/^[A-Za-z0-9\-\/]+$/',
+            ],
+
+            /*
+             * Business document
+             */
+            'business_document' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:5120',
+            ],
+
+            /*
+             * Bank information
+             */
+            'bank_name' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'bank_account_name' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            'bank_account_number' => [
+                'required',
+                'string',
+                'min:3',
+                'max:100',
+                'regex:/^[A-Za-z0-9\-]+$/',
+            ],
+
+            'bank_branch' => [
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
+
+            /*
+             * Bank document
+             */
+            'bank_document' => [
+                'required',
+                'file',
+                'mimes:pdf,jpg,jpeg,png',
+                'max:5120',
+            ],
+
+            /*
+             * Vendor logo
+             */
+            'logo' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
+
+            /*
+             * Terms
+             */
+            'terms' => [
+                'required',
+                'accepted',
+            ],
         ]);
 
         try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Normalize email
+            |--------------------------------------------------------------------------
+            */
             $email = strtolower(trim($data['email']));
 
             /*
-             * Check existing vendor
-             */
+            |--------------------------------------------------------------------------
+            | Check existing vendor
+            |--------------------------------------------------------------------------
+            */
             $existing = Dokan::where('email', $email)->first();
 
-            if ($existing && $existing->status !== Dokan::STATUS_REJECTED) {
+            if (
+                $existing
+                && $existing->status !== Dokan::STATUS_REJECTED
+            ) {
                 return back()
                     ->withInput()
                     ->withErrors([
-                        'email' => 'This email is already registered as a vendor.'
+                        'email' => 'This email is already registered as a vendor.',
                     ]);
             }
 
             /*
-             * Store uploaded files
-             */
+            |--------------------------------------------------------------------------
+            | Store uploaded business document
+            |--------------------------------------------------------------------------
+            */
             $data['business_document'] = $request
                 ->file('business_document')
-                ->store('vendor-documents/business', 'public');
-
-            $data['bank_document'] = $request
-                ->file('bank_document')
-                ->store('vendor-documents/bank', 'public');
-
-            $data['logo'] = $request
-                ->file('logo')
-                ->store('vendor-logos', 'public');
+                ->store(
+                    'vendor-documents/business',
+                    'public'
+                );
 
             /*
-             * Additional database values
-             */
+            |--------------------------------------------------------------------------
+            | Store uploaded bank document
+            |--------------------------------------------------------------------------
+            */
+            $data['bank_document'] = $request
+                ->file('bank_document')
+                ->store(
+                    'vendor-documents/bank',
+                    'public'
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Store vendor logo
+            |--------------------------------------------------------------------------
+            */
+            $data['logo'] = $request
+                ->file('logo')
+                ->store(
+                    'vendor-logos',
+                    'public'
+                );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Additional database values
+            |--------------------------------------------------------------------------
+            */
             $data['user_id'] = Auth::id();
             $data['email'] = $email;
             $data['status'] = Dokan::STATUS_PENDING;
             $data['password'] = null;
             $data['rejection_comment'] = null;
 
-            // terms is only for validation, not database
+            /*
+             * terms is only used for validation.
+             * It should not be saved to the database.
+             */
             unset($data['terms']);
 
             /*
-             * Save vendor
-             */
+            |--------------------------------------------------------------------------
+            | Save vendor
+            |--------------------------------------------------------------------------
+            */
             if ($existing) {
+
                 $existing->update($data);
+
                 $dokan = $existing->fresh();
+
             } else {
+
                 $dokan = Dokan::create($data);
             }
 
             /*
-             * Send registration email
-             */
+            |--------------------------------------------------------------------------
+            | Send registration email
+            |--------------------------------------------------------------------------
+            */
             Mail::to($dokan->email)->send(
                 new DokanApplicationReceived($dokan)
             );
@@ -218,11 +540,19 @@ class PageController extends Controller
 
         } catch (\Throwable $e) {
 
-            Log::error('Vendor registration failed', [
-                'email' => $request->email,
-                'user_id' => Auth::id(),
-                'error' => $e->getMessage(),
-            ]);
+            /*
+            |--------------------------------------------------------------------------
+            | Log error
+            |--------------------------------------------------------------------------
+            */
+            Log::error(
+                'Vendor registration failed',
+                [
+                    'email' => $data['email'] ?? null,
+                    'user_id' => Auth::id(),
+                    'error' => $e->getMessage(),
+                ]
+            );
 
             return back()
                 ->withInput()

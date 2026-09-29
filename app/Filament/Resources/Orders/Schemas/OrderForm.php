@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources\Orders\Schemas;
 
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
-use Filament\Forms\Components\FileUpload;
 
 class OrderForm
 {
@@ -13,21 +13,24 @@ class OrderForm
     {
         return $schema
             ->components([
-                TextInput::make('tracking_number')
-                    ->required()
-                    ->default(fn () => 'ORD-' . strtoupper(uniqid())),
 
-                    
+                TextInput::make('tracking_number')
+                    ->label('Tracking Number')
+                    ->required()
+                    ->disabled()
+                    ->dehydrated(false),
 
                 Select::make('user_id')
+                    ->label('Customer')
                     ->relationship('user', 'name')
                     ->searchable()
                     ->preload()
                     ->required()
                     ->exists('users', 'id'),
 
-               Select::make('dokan_id')
-                    ->relationship('dokan', 'company_name') 
+                Select::make('dokan_id')
+                    ->label('Vendor')
+                    ->relationship('dokan', 'company_name')
                     ->searchable()
                     ->preload()
                     ->required()
@@ -36,7 +39,7 @@ class OrderForm
                 TextInput::make('shipping_address_display')
                     ->label('Shipping Address')
                     ->formatStateUsing(function ($state, $record) {
-                        $shipping = $record->shippingAddress;
+                        $shipping = $record?->shippingAddress;
 
                         if (! $shipping) {
                             return 'No Address';
@@ -51,13 +54,16 @@ class OrderForm
                         ]));
                     })
                     ->disabled()
-                    ->dehydrated(false),
+                    ->dehydrated(false)
+                    ->columnSpanFull(),
 
                 TextInput::make('total_amount')
+                    ->label('Total Amount')
                     ->numeric()
                     ->required(),
 
                 Select::make('status')
+                    ->label('Order Status')
                     ->options([
                         'pending' => 'Pending',
                         'processing' => 'Processing',
@@ -68,33 +74,39 @@ class OrderForm
                     ->required(),
 
                 Select::make('payment_method')
+                    ->label('Payment Method')
                     ->options([
                         'cod' => 'Cash on Delivery',
-                        'online' => 'Online Payment',
+                        'esewa' => 'eSewa',
+                        'bank' => 'Bank Transfer',
                     ])
-                    ->default('cod')
                     ->required(),
 
                 Select::make('payment_status')
+                    ->label('Payment Status')
                     ->options([
-                        'pending' => 'Pending',
+                        'pending' => 'Pending Verification',
                         'paid' => 'Paid',
                         'failed' => 'Failed',
                     ])
                     ->default('pending')
                     ->required(),
-                    
-FileUpload::make('payment_receipt')
-    ->label('Payment Receipt')
-    ->disk('public')
-    ->directory('payment_receipts')
-    ->image()
-    ->imagePreviewHeight('300')
-    ->openable()
-    ->downloadable()
-    ->disabled()
-    ->dehydrated(false)
-    ->columnSpanFull(),
+
+               FileUpload::make('payment_receipt')
+                    ->label('Payment Receipt')
+                    ->disk('public')
+                    ->directory('payment_receipts')
+                    ->acceptedFileTypes([
+                        'image/jpeg',
+                        'image/png',
+                        'image/webp',
+                        'application/pdf',
+                    ])
+                    ->openable()
+                    ->downloadable()
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->columnSpanFull(),
             ]);
     }
 }

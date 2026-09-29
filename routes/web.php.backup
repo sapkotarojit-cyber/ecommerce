@@ -1,0 +1,408 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+
+use App\Http\Controllers\Frontend\AuthController;
+use App\Http\Controllers\Frontend\PageController;
+use App\Http\Controllers\Frontend\ShippingAddressController;
+use App\Http\Controllers\Frontend\CartController;
+use App\Http\Controllers\Frontend\OrderController;
+use App\Http\Controllers\Frontend\CheckoutController;
+use App\Http\Controllers\Frontend\ProfileController;
+use App\Http\Controllers\Frontend\ReturnRequestController;
+
+/*
+|--------------------------------------------------------------------------
+| Public
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/', [PageController::class, 'home'])
+    ->name('home');
+
+Route::get('/about', [PageController::class, 'about'])
+    ->name('about');
+
+Route::get('/dokan-registration', [PageController::class, 'dokan_registration'])
+    ->name('dokan_registration');
+
+Route::post('/dokan-registration', [PageController::class, 'dokan_registration_submit'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('dokan_registration_submit');
+
+Route::get('/products', [PageController::class, 'products'])
+    ->name('products');
+
+Route::get('/product/{id}', [PageController::class, 'product'])
+    ->whereNumber('id')
+    ->name('product');
+
+Route::get('/support', [PageController::class, 'support'])
+    ->name('support');
+
+Route::get('/cart', [CartController::class, 'index'])
+    ->name('cart.index');
+
+
+/*
+|--------------------------------------------------------------------------
+| Authentication
+|--------------------------------------------------------------------------
+*/
+
+/*
+|--------------------------------------------------------------------------
+| Google OAuth
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/auth/redirect', [AuthController::class, 'redirect'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('redirect');
+
+Route::get('/auth/callback', [AuthController::class, 'callback'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('auth.callback');
+
+Route::get('/auth/google/callback', [AuthController::class, 'callback'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('google.callback');
+
+
+/*
+|--------------------------------------------------------------------------
+| Auth0
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/auth/auth0/redirect', [AuthController::class, 'auth0Redirect'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('auth0.redirect');
+
+Route::get('/auth/auth0/callback', [AuthController::class, 'auth0Callback'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('auth0.callback');
+
+
+/*
+|--------------------------------------------------------------------------
+| Vendor Email Check
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/vendor/check-email', [AuthController::class, 'checkVendorEmail'])
+    ->middleware('adaptive.rate:sensitive')
+    ->name('vendor.check_email');
+
+
+/*
+|--------------------------------------------------------------------------
+| Guest Authentication
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('guest')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/login', [AuthController::class, 'login'])
+        ->name('login');
+
+    Route::post('/login', [AuthController::class, 'loginSubmit'])
+        ->middleware('adaptive.rate:auth')
+        ->name('login.submit');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Registration
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/register', [AuthController::class, 'register'])
+        ->name('register');
+
+   Route::post('/register', [AuthController::class, 'registerSubmit'])
+    ->middleware('adaptive.rate:registration')
+    ->name('register.submit');
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| Forgot Password
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/forgot-password', [AuthController::class, 'showForgotPasswordForm'])
+    ->name('password.request');
+
+Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])
+    ->middleware('adaptive.rate:password_reset')
+    ->name('password.email');
+
+
+/*
+|--------------------------------------------------------------------------
+| Password Reset
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/reset-password/{token}', [AuthController::class, 'showResetPasswordForm'])
+    ->where('token', '[A-Za-z0-9]+')
+    ->name('password.reset');
+
+Route::post('/reset-password', [AuthController::class, 'resetPassword'])
+    ->middleware('adaptive.rate:password_reset')
+    ->name('password.update');
+
+
+/*
+|--------------------------------------------------------------------------
+| Email Verification
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/verify-email', [AuthController::class, 'showVerifyForm'])
+    ->name('verify.show');
+
+Route::post('/verify-email', [AuthController::class, 'verifyCode'])
+    ->middleware('adaptive.rate:verification')
+    ->name('verify.submit');
+
+
+Route::post('/resend-verification-code', [AuthController::class, 'resendCode'])
+    ->middleware('adaptive.rate:verification')
+    ->name('verify.resend');
+
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('auth')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logout
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post('/logout', [AuthController::class, 'logout'])
+        ->middleware('adaptive.rate:sensitive')
+        ->name('logout');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Profile
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/profile', [ProfileController::class, 'edit'])
+        ->name('profile.edit');
+
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->middleware('adaptive.rate:sensitive')
+        ->name('profile.update');
+
+    Route::get('/settings', [ProfileController::class, 'settings'])
+        ->name('settings');
+
+    Route::put('/settings/password', [ProfileController::class, 'updatePassword'])
+        ->middleware('adaptive.rate:sensitive')
+        ->name('settings.password');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shipping Address
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('shipping-address')
+        ->name('shipping-address.')
+        ->group(function () {
+
+            Route::get('/', [ShippingAddressController::class, 'index'])
+                ->name('index');
+
+            Route::get('/create', [ShippingAddressController::class, 'create'])
+                ->name('create');
+
+            Route::post('/', [ShippingAddressController::class, 'store'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('store');
+
+            Route::post('/quick-store', [ShippingAddressController::class, 'quickStore'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('quick-store');
+
+            Route::get('/{address}/edit', [ShippingAddressController::class, 'edit'])
+                ->name('edit');
+
+            Route::patch('/{address}', [ShippingAddressController::class, 'update'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('update');
+
+            Route::delete('/{address}', [ShippingAddressController::class, 'destroy'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('destroy');
+
+            Route::patch('/{address}/set-default', [ShippingAddressController::class, 'setDefault'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('set-default');
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cart
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('cart')
+        ->name('cart.')
+        ->group(function () {
+
+            Route::post('/add', [CartController::class, 'add'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('add');
+
+            Route::post('/buy-now', [CartController::class, 'buyNow'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('buy-now');
+
+            Route::post('/clear', [CartController::class, 'clear'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('clear');
+
+            Route::get('/count', [CartController::class, 'count'])
+                ->name('count');
+
+            Route::match(['post', 'patch'], '/{id}', [CartController::class, 'update'])
+                ->whereNumber('id')
+                ->middleware('adaptive.rate:sensitive')
+                ->name('update');
+
+            Route::delete('/{id}', [CartController::class, 'destroy'])
+                ->whereNumber('id')
+                ->middleware('adaptive.rate:sensitive')
+                ->name('destroy');
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Orders
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('orders')
+        ->name('orders.')
+        ->group(function () {
+
+            Route::get('/', [OrderController::class, 'index'])
+                ->name('index');
+
+            Route::get('/checkout', [CheckoutController::class, 'checkout'])
+                ->name('checkout');
+
+            Route::post('/cart/checkout-selected', [CheckoutController::class, 'postCheckoutSelected'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('cart.checkout.selected');
+
+            Route::post('/', [CheckoutController::class, 'store'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('store');
+
+            Route::get('/esewa/pay/{order}', [OrderController::class, 'esewaPay'])
+                ->whereNumber('order')
+                ->name('esewa.pay');
+
+            Route::get('/bank-transfer/pay/{order}', [OrderController::class, 'bankPaymentPage'])
+                ->whereNumber('order')
+                ->name('bank.pay');
+
+            Route::get('/track', [OrderController::class, 'trackForm'])
+                ->name('track');
+
+            Route::post('/track', [OrderController::class, 'trackResult'])
+                ->middleware('adaptive.rate:sensitive')
+                ->name('track.submit');
+
+            Route::get('/{id}/return', [ReturnRequestController::class, 'create'])
+                ->whereNumber('id')
+                ->name('returns.create');
+
+            Route::post('/{id}/return', [ReturnRequestController::class, 'store'])
+                ->whereNumber('id')
+                ->middleware('adaptive.rate:sensitive')
+                ->name('returns.store');
+
+            Route::get('/{id}/invoice', [OrderController::class, 'invoice'])
+                ->whereNumber('id')
+                ->name('invoice');
+
+            Route::get('/{id}/cancel', [OrderController::class, 'cancelForm'])
+                ->whereNumber('id')
+                ->name('cancel.create');
+
+            Route::post('/{id}/cancel', [OrderController::class, 'cancel'])
+                ->whereNumber('id')
+                ->middleware('adaptive.rate:sensitive')
+                ->name('cancel');
+
+            Route::get('/{id}', [OrderController::class, 'show'])
+                ->whereNumber('id')
+                ->name('show');
+        });
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Return Requests
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/my-return-requests', [ReturnRequestController::class, 'index'])
+        ->name('returns.index');
+
+    Route::get('/my-return-requests/{id}', [ReturnRequestController::class, 'show'])
+        ->whereNumber('id')
+        ->name('returns.show');
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| eSewa Callback
+|--------------------------------------------------------------------------
+*/
+
+Route::match(['get', 'post'], '/payment/esewa/success', [OrderController::class, 'esewaSuccess'])
+    ->name('esewa.success')
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+
+Route::get('/payment/esewa/failure', [OrderController::class, 'esewaFailure'])
+    ->name('esewa.failure');
+
+
+/*
+|--------------------------------------------------------------------------
+| Bank Payment Callback
+|--------------------------------------------------------------------------
+*/
+
+Route::match(['get', 'post'], '/payment/bank/success', [OrderController::class, 'bankSuccess'])
+    ->name('bank.success')
+    ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+
+Route::match(['get', 'post'], '/payment/bank/failure', [OrderController::class, 'bankFailure'])
+    ->name('bank.failure');

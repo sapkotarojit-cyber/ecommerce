@@ -46,8 +46,10 @@
                 
                 <!-- Screenshot Note -->
                 <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded text-blue-700 text-sm">
-                    <strong>Note:</strong> Please take a screenshot of your successful transaction receipt before submitting.
-                </div>
+                <strong>Note:</strong>
+                Upload the transaction receipt after completing your bank transfer.
+                Your payment will remain pending until our team verifies the receipt.  
+              </div>
 
                 <!-- Upload Payment Receipt -->
                 <div>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\OrderResource\RelationManagers;
+namespace App\Filament\Dokan\Resources\Orders\RelationManagers;
 
 use App\Models\OrderItem;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -11,7 +11,7 @@ use Filament\Tables\Table;
 
 class OrderItemsRelationManager extends RelationManager
 {
-    protected static string $relationship = 'order_items';
+    protected static string $relationship = 'orderItems';
 
     public function table(Table $table): Table
     {

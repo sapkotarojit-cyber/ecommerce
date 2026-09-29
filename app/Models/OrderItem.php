@@ -6,13 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class OrderItem extends Model
 {
-
-protected $fillable = [
+    protected $fillable = [
         'order_id',
         'product_id',
         'varient_id',
         'qty',
         'amount',
+    ];
+
+    protected $casts = [
+        'qty' => 'integer',
+        'amount' => 'decimal:2',
     ];
 
     public function order()
@@ -27,6 +31,9 @@ protected $fillable = [
 
     public function varient()
     {
-        return $this->belongsTo(ProductVarient::class, 'varient_id');
+        return $this->belongsTo(
+            ProductVarient::class,
+            'varient_id'
+        );
     }
 }

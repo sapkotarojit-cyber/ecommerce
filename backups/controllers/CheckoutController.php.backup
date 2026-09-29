@@ -1,0 +1,467 @@
+<?php
+
+namespace App\Http\Controllers\Frontend;
+
+use App\Http\Controllers\Controller;
+use App\Models\Cart;
+use App\Models\Order;
+use App\Models\ShippingAddress;
+use App\Models\ProductVarient;
+use App\Mail\OrderPlacedMail;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+
+class CheckoutController extends Controller
+{
+    /**
+     * Select cart items for checkout.
+     */
+    public function postCheckoutSelected(Request $request)
+    {
+        $validated = $request->validate([
+            'selected_items' => [
+                'required',
+                'array',
+                'min:1',
+                'max:100',
+            ],
+            'selected_items.*' => [
+                'required',
+                'integer',
+                'min:1',
+                'distinct',
+                'exists:carts,id',
+            ],
+        ]);
+
+        $ids = Cart::where('user_id', Auth::id())
+            ->whereIn('id', $validated['selected_items'])
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($ids)) {
+            return redirect()
+                ->route('cart.index')
+                ->with(
+                    'error',
+                    'Please select at least one valid cart item.'
+                );
+        }
+
+        session([
+            'checkout_cart_ids' => $ids,
+        ]);
+
+        return redirect()->route('orders.checkout');
+    }
+
+    /**
+     * Display checkout page.
+     */
+    public function checkout()
+    {
+        $ids = session('checkout_cart_ids');
+
+        if (empty($ids)) {
+            return redirect()
+                ->route('cart.index')
+                ->with(
+                    'error',
+                    'Please select items from your cart.'
+                );
+        }
+
+        $cartItems = Cart::where('user_id', Auth::id())
+            ->whereIn('id', $ids)
+            ->with(['product', 'varient', 'dokan'])
+            ->get();
+
+        if ($cartItems->isEmpty()) {
+            session()->forget('checkout_cart_ids');
+
+            return redirect()
+                ->route('cart.index')
+                ->with(
+                    'error',
+                    'Your selected cart items are empty.'
+                );
+        }
+
+        $addresses = ShippingAddress::where(
+            'user_id',
+            Auth::id()
+        )->get();
+
+        $vendorTotal = [];
+        $grandTotal = 0;
+
+        foreach ($cartItems as $item) {
+
+            $price = (float) ($item->varient->price ?? 0);
+            $discount = (float) ($item->varient->discount ?? 0);
+
+            $finalPrice = $price - ($price * $discount / 100);
+            $total = $finalPrice * $item->qty;
+
+            $dokanId = $item->dokan_id ?? 0;
+
+            if (!isset($vendorTotal[$dokanId])) {
+                $vendorTotal[$dokanId] = [
+                    'dokan' => $item->dokan,
+                    'subtotal' => 0,
+                    'items' => [],
+                ];
+            }
+
+            $vendorTotal[$dokanId]['subtotal'] += $total;
+            $vendorTotal[$dokanId]['items'][] = $item;
+
+            $grandTotal += $total;
+        }
+
+        return view(
+            'frontend.orders.checkout',
+            compact(
+                'cartItems',
+                'addresses',
+                'vendorTotal',
+                'grandTotal'
+            )
+        );
+    }
+
+    /**
+     * Create order.
+     */
+    public function store(Request $request)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | Strict input validation
+        |--------------------------------------------------------------------------
+        */
+
+        $validated = $request->validate([
+            'shipping_address_id' => [
+                'required',
+                'integer',
+                'min:1',
+                'exists:shipping_addresses,id',
+            ],
+
+            'payment_method' => [
+                'required',
+                'string',
+                'in:esewa,bank,cod',
+            ],
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get selected checkout items
+        |--------------------------------------------------------------------------
+        */
+
+        $ids = session('checkout_cart_ids');
+
+        if (empty($ids)) {
+            return redirect()
+                ->route('cart.index')
+                ->with(
+                    'error',
+                    'Please select items first.'
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Make sure the address belongs to the logged-in user
+        |--------------------------------------------------------------------------
+        */
+
+        $address = ShippingAddress::where(
+            'id',
+            $validated['shipping_address_id']
+        )
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create order inside database transaction
+            |--------------------------------------------------------------------------
+            */
+
+            $order = DB::transaction(function () use (
+                $ids,
+                $address,
+                $validated
+            ) {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Get ONLY this user's selected cart items
+                |--------------------------------------------------------------------------
+                */
+
+                $items = Cart::where(
+                    'user_id',
+                    Auth::id()
+                )
+                    ->whereIn('id', $ids)
+                    ->with(['product', 'varient'])
+                    ->get();
+
+                if ($items->isEmpty()) {
+                    throw new \Exception(
+                        'Your selected cart items are empty.'
+                    );
+                }
+
+                $total = 0;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Check stock and calculate total
+                |--------------------------------------------------------------------------
+                */
+
+                foreach ($items as $item) {
+
+                    $variant = ProductVarient::where(
+                        'id',
+                        $item->varient_id
+                    )
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$variant) {
+                        throw new \Exception(
+                            'Product variant not found.'
+                        );
+                    }
+
+                    if ($variant->qty < $item->qty) {
+
+                        $productName =
+                            $item->product->title ?? 'Product';
+
+                        throw new \Exception(
+                            "{$productName} does not have enough stock. "
+                            . "Only {$variant->qty} available."
+                        );
+                    }
+
+                    $price = (float) ($variant->price ?? 0);
+                    $discount = (float) ($variant->discount ?? 0);
+
+                    $finalPrice =
+                        $price - ($price * $discount / 100);
+
+                    $total +=
+                        $finalPrice * $item->qty;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Create order
+                |--------------------------------------------------------------------------
+                */
+
+                $order = Order::create([
+                    'user_id' => Auth::id(),
+                    'dokan_id' => $items->first()->dokan_id,
+                    'shipping_address_id' => $address->id,
+                    'total_amount' => $total,
+                    'status' => 'pending',
+                    'payment_method' =>
+                        $validated['payment_method'],
+                    'payment_status' => 'pending',
+                ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | Create order items
+                | Decrease stock
+                | Remove purchased cart items
+                |--------------------------------------------------------------------------
+                */
+
+                foreach ($items as $item) {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Lock variant again
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $variant = ProductVarient::where(
+                        'id',
+                        $item->varient_id
+                    )
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$variant) {
+                        throw new \Exception(
+                            'Product variant no longer exists.'
+                        );
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Final stock check
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if ($variant->qty < $item->qty) {
+
+                        $productName =
+                            $item->product->title ?? 'Product';
+
+                        throw new \Exception(
+                            "{$productName} is no longer available "
+                            . "in the requested quantity."
+                        );
+                    }
+
+                    $price = (float) ($variant->price ?? 0);
+                    $discount = (float) ($variant->discount ?? 0);
+
+                    $finalPrice =
+                        $price - ($price * $discount / 100);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Create order item
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $order->orderItems()->create([
+                        'product_id' => $item->product_id,
+                        'varient_id' => $item->varient_id,
+                        'qty' => $item->qty,
+                        'amount' =>
+                            $finalPrice * $item->qty,
+                    ]);
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Decrease stock
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $variant->decrement(
+                        'qty',
+                        $item->qty
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Remove purchased item from cart
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $item->delete();
+                }
+
+                return $order;
+            });
+
+        } catch (\Exception $e) {
+
+            return redirect()
+                ->route('cart.index')
+                ->with(
+                    'error',
+                    $e->getMessage()
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clear checkout session
+        |--------------------------------------------------------------------------
+        */
+
+        session()->forget('checkout_cart_ids');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Load order relationships
+        |--------------------------------------------------------------------------
+        */
+
+        $order->load([
+            'user',
+            'dokan',
+            'shippingAddress',
+            'orderItems.product',
+            'orderItems.varient',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Send order confirmation email
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $order->user &&
+            $order->user->email
+        ) {
+            Mail::to($order->user->email)
+                ->send(
+                    new OrderPlacedMail($order)
+                );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Payment redirects
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            $validated['payment_method'] === 'esewa'
+        ) {
+
+            return redirect()->route(
+                'orders.esewa.pay',
+                $order->id
+            );
+        }
+
+        if (
+            $validated['payment_method'] === 'bank'
+        ) {
+
+            return redirect()->route(
+                'orders.bank.pay',
+                [
+                    'order' => $order->id,
+                ]
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cash on Delivery
+        |--------------------------------------------------------------------------
+        */
+
+        return redirect()
+            ->route(
+                'orders.show',
+                $order->id
+            )
+            ->with(
+                'success',
+                'Order placed successfully with Cash on Delivery.'
+            );
+    }
+}

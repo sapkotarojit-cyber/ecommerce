@@ -18,8 +18,7 @@ return new class extends Migration
             $table->foreignId('shipping_address_id')->constrained()->cascadeOnDelete();
             $table->double('total_amount');
             $table->string('status')->default('pending');
-            $table->enum('payment_method', ['cod', 'kalti'])->default('cod');
-            $table->string('payment_status')->default('pending');
+            $table->enum('payment_method', ['cod', 'esewa', 'bank'])->default('cod');            $table->string('payment_status')->default('pending');
             $table->timestamps();
         });
     }
