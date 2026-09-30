@@ -21,6 +21,16 @@
                 </div>
             @endif
 
+            @if ($errors->any())
+                <div class="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('password.update') }}" class="space-y-4">
+
             <form method="POST" action="{{ route('password.update') }}" class="space-y-4">
                 @csrf
                 <input type="hidden" name="token" value="{{ $token }}">

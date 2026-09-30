@@ -280,29 +280,33 @@ class AdaptiveRateLimit
                 $attemptKey
             );
 
-        if ($attempts >= $maxAttempts) {
+if ($attempts >= $maxAttempts) {
 
-            $backoff =
-                $this->createBackoff(
-                    config: $config,
-                    violationKey: $violationKey,
-                    decaySeconds: $decaySeconds
-                );
+    $backoff = $this->createBackoff(
+        config: $config,
+        violationKey: $violationKey,
+        decaySeconds: $decaySeconds
+    );
 
-            /*
-             * Store the cooldown independently from
-             * the normal request window.
-             */
-            RateLimiter::hit(
-                $cooldownKey,
-                $backoff
-            );
+    /*
+     * Clear the exhausted request window.
+     *
+     * Otherwise, after the cooldown expires,
+     * the same attempts count immediately triggers
+     * another cooldown.
+     */
+    RateLimiter::clear($attemptKey);
 
-            $this->reject(
-                $request,
-                $backoff
-            );
-        }
+    RateLimiter::hit(
+        $cooldownKey,
+        $backoff
+    );
+
+    $this->reject(
+        $request,
+        $backoff
+    );
+}
 
         /*
          * Count the current request.
@@ -408,33 +412,23 @@ class AdaptiveRateLimit
         );
     }
 
-    /**
+        /**
      * Return a consistent HTTP 429 response.
+     *
+     * This method always aborts the request and therefore never returns.
      */
     private function reject(
         Request $request,
         int $retryAfter
     ): never {
-        $retryAfter = max(
-            1,
-            $retryAfter
-        );
+        $retryAfter = max(1, $retryAfter);
 
-        if (
-            $request->expectsJson() ||
-            $request->ajax()
-        ) {
+        if ($request->expectsJson() || $request->ajax()) {
             abort(
-                response()->json(
-                    [
-                        'message' =>
-                            'Too many requests. Please try again later.',
-
-                        'retry_after' =>
-                            $retryAfter,
-                    ],
-                    429
-                )->header(
+                response()->json([
+                    'message' => 'Too many requests. Please try again later.',
+                    'retry_after' => $retryAfter,
+                ], 429)->header(
                     'Retry-After',
                     (string) $retryAfter
                 )
@@ -442,13 +436,15 @@ class AdaptiveRateLimit
         }
 
         abort(
-            response(
-                'Too many requests. Please try again later.',
-                429
-            )->header(
-                'Retry-After',
-                (string) $retryAfter
-            )
+            response()
+                ->view('errors.429', [
+                    'retryAfter' => $retryAfter,
+                ], 429)
+                ->header(
+                    'Retry-After',
+                    (string) $retryAfter
+                )
         );
     }
 }
+

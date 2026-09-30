@@ -516,71 +516,76 @@ class AuthController extends Controller
     | RESET PASSWORD
     |--------------------------------------------------------------------------
     */
+public function resetPassword(Request $request)
+{
+    $validated = $this->validateStrict($request, [
+        'token' => [
+            'required',
+            'string',
+            'max:512',
+            'regex:/^[A-Za-z0-9]+$/',
+        ],
 
-    public function resetPassword(Request $request)
-    {
-        $validated = $this->validateStrict($request, [
-            'token' => [
-                'required',
-                'string',
-                'max:512',
-                'regex:/^[A-Za-z0-9]+$/',
-            ],
+        'email' => [
+            'required',
+            'string',
+            'email:rfc',
+            'max:254',
+        ],
 
-            'email' => [
-                'required',
-                'string',
-                'email:rfc',
-                'max:254',
-            ],
+        'password' => [
+            'required',
+            'string',
+            'min:8',
+            'max:128',
+            'confirmed',
+            PasswordRule::defaults(),
+        ],
 
-            'password' => [
-                'required',
-                'string',
-                'min:8',
-                'max:128',
-                'confirmed',
-                PasswordRule::defaults(),
-            ],
-        ]);
+        // ADD THIS
+        'password_confirmation' => [
+            'required',
+            'string',
+            'min:8',
+            'max:128',
+        ],
+    ]);
 
-        $email = strtolower(trim($validated['email']));
+    $email = strtolower(trim($validated['email']));
 
-        $status = Password::broker('users')->reset(
-            [
-                'email' => $email,
-                'password' => $validated['password'],
-                'password_confirmation' => $validated['password_confirmation'],
-                'token' => $validated['token'],
-            ],
-            function ($user, $password) {
+    $status = Password::broker('users')->reset(
+        [
+            'email' => $email,
+            'password' => $validated['password'],
+            'password_confirmation' => $validated['password_confirmation'],
+            'token' => $validated['token'],
+        ],
+        function ($user, $password) {
 
-                $user->forceFill([
-                    'password' => $password,
-                    'remember_token' => Str::random(60),
-                ])->save();
+            $user->forceFill([
+                'password' => $password,
+                'remember_token' => Str::random(60),
+            ])->save();
 
-                event(new PasswordReset($user));
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            return redirect()
-                ->route('login')
-                ->with(
-                    'success',
-                    'Your password has been reset successfully. Please log in.'
-                );
+            event(new PasswordReset($user));
         }
+    );
 
-        return back()
-            ->withInput([
-                'email' => $email,
-            ])
-            ->withErrors([
-                'email' => 'The password reset link is invalid or has expired.',
-            ]);
+    if ($status === Password::PASSWORD_RESET) {
+        return redirect()
+            ->route('login')
+            ->with(
+                'success',
+                'Your password has been reset successfully. Please log in.'
+            );
     }
+
+    return back()
+        ->withInput()
+        ->withErrors([
+            'email' => __($status),
+        ]);
+}
 
     /*
     |--------------------------------------------------------------------------

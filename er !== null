@@ -1,0 +1,14 @@
+[90m= [39m[34;4mApp\Models\User[39;24m {#9786
+    [34mid[39m: [35m1[39m,
+    [34mname[39m: [32m"[39m[32mRojit Sapkota[39m[32m"[39m,
+    [34memail[39m: [32m"[39m[32msapkotarojit@gmail.com[39m[32m"[39m,
+    [34mgoogle_id[39m: [32m"[39m[32m116532664211310945759[39m[32m"[39m,
+    [34memail_verified_at[39m: [32m"[39m[32m2026-09-29 11:05:58[39m[32m"[39m,
+    #[33mpassword[39m: [32m"[39m\$[32m2y[39m\$[32m12[39m\$[32mse0C56NWsyjWYfbBA5w6veKkwtvahd0f/W3BNa37ZUBwAj6rB10rW[39m[32m"[39m,
+    [34mis_admin[39m: [35m0[39m,
+    [34mverification_code[39m: [36mnull[39m,
+    [34mverification_code_expires_at[39m: [36mnull[39m,
+    #[33mremember_token[39m: [32m"[39m[32mCdyS5SedIMHtnvjIuAWlja3NLbQfm80OHpMnup7NZnr3sV9X1rXkpESuf5wZ[39m[32m"[39m,
+    [34mcreated_at[39m: [32m"[39m[32m2026-09-29 11:05:58[39m[32m"[39m,
+    [34mupdated_at[39m: [32m"[39m[32m2026-09-29 11:06:19[39m[32m"[39m,
+  }

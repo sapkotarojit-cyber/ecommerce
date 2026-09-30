@@ -141,10 +141,13 @@ class OrderController extends Controller
      * ----------------------------------------------------------------- */
 
     public function esewaPay(int $order)
+    
     {
         $firstOrder = Order::query()
             ->where('user_id', Auth::id())
             ->findOrFail($order);
+
+ 
 
         if ($firstOrder->payment_method !== 'esewa' || $firstOrder->payment_status !== 'pending') {
             return redirect()->route('orders.show', $firstOrder->id)
@@ -176,7 +179,7 @@ class OrderController extends Controller
         if ($total <= 0) {
             return redirect()->route('orders.index')->with('error', 'Invalid payment amount.');
         }
-
+        
         $productCode = (string) config('services.esewa.merchant_code', env('ESEWA_PRODUCT_CODE', 'EPAYTEST'));
         $secret = (string) config('services.esewa.secret_key');
         if ($productCode === '' || $secret === '') {

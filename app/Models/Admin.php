@@ -35,4 +35,11 @@ class Admin extends Authenticatable implements FilamentUser
     {
         return true;
     }
+
+    public function sendPasswordResetNotification($token): void
+{
+    $this->notify(
+        new \App\Notifications\AdminResetPasswordNotification($token)
+    );
+}
 }

@@ -11,6 +11,7 @@ use App\Models\ShippingAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
@@ -638,43 +639,26 @@ class CheckoutController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (
-            count($orders) > 1
-        ) {
-            return redirect()
-                ->route('orders.index')
-                ->with(
-                    'success',
-                    'Your orders were created successfully.'
-                );
-        }
+                $order = $orders[0];
 
-        $order =
-            $orders[0];
 
-        if (
-            $validated[
-                'payment_method'
-            ] === 'esewa'
-        ) {
-            return redirect()
-                ->route(
-                    'orders.esewa.pay',
-                    $order->id
-                );
-        }
+                if ($validated['payment_method'] === 'esewa') {
+                    return redirect()->route('orders.esewa.pay', $order->id);
+                }
 
-        if (
-            $validated[
-                'payment_method'
-            ] === 'bank'
-        ) {
-            return redirect()
-                ->route(
-                    'orders.bank.pay',
-                    $order->id
-                );
-        }
+            if ($validated['payment_method'] === 'bank') {
+                $groupId = (string) Str::uuid();
+
+                Order::whereIn('id', collect($orders)->pluck('id'))
+                    ->update(['payment_group_id' => $groupId]);
+
+                return redirect()->route('orders.bank.pay', $order->id);
+            }
+
+            if (count($orders) > 1) {
+                return redirect()->route('orders.index')
+                    ->with('success', 'Your orders were placed successfully.');
+            }
 
         return redirect()
             ->route(

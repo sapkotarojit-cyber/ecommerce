@@ -13,48 +13,31 @@ class ReturnRequestStatusChangedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public ReturnRequest $returnRequest;
-
-    public string $oldReturnStatus;
-    public string $newReturnStatus;
-
-    public string $oldRefundStatus;
-    public string $newRefundStatus;
-
     public function __construct(
-        ReturnRequest $returnRequest,
-        string $oldReturnStatus,
-        string $newReturnStatus,
-        string $oldRefundStatus,
-        string $newRefundStatus,
+        public ReturnRequest $returnRequest,
+        public string $oldStatus,
+        public string $newStatus,
+        public string $oldRefundStatus,
+        public string $newRefundStatus,
+        public bool $returnStatusChanged,
+        public bool $refundStatusChanged,
     ) {
-        $this->returnRequest = $returnRequest;
-
-        $this->oldReturnStatus = $oldReturnStatus;
-        $this->newReturnStatus = $newReturnStatus;
-
-        $this->oldRefundStatus = $oldRefundStatus;
-        $this->newRefundStatus = $newRefundStatus;
     }
 
     public function envelope(): Envelope
     {
+        $orderNumber = $this->returnRequest->order?->id
+            ?? $this->returnRequest->order_id;
+
         return new Envelope(
-            subject: 'Return & Refund Status Updated - Order #' .
-                ($this->returnRequest->order?->id ?? $this->returnRequest->order_id) .
-                ' - EmpireInnovation',
+            subject: 'Return & Refund Status Updated - Order #' . $orderNumber . ' - EmpireInnovation',
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            view: 'emails.return-request-status-changed',
+            view: 'emails/return-request-status-changed',
         );
-    }
-
-    public function attachments(): array
-    {
-        return [];
     }
 }

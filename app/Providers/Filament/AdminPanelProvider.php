@@ -2,14 +2,17 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Widgets\ActiveDokans;
+use App\Filament\Widgets\OrdersChart;
+use App\Filament\Widgets\StatsOverview;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Navigation\MenuItem;
 use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
@@ -19,9 +22,6 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use App\Filament\Widgets\OrdersChart;
-use App\Filament\Widgets\StatsOverview;
-use App\Filament\Widgets\ActiveDokans;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -36,24 +36,43 @@ class AdminPanelProvider extends PanelProvider
             ->homeUrl('/')
             ->brandName('Empire Innovation')
             ->registration(\App\Filament\Pages\Auth\Register::class)
+
             ->authGuard('admin')
             ->authPasswordBroker('admins')
-            ->passwordReset() 
-            ->colors(['primary' => Color::Amber,])
+
+            ->passwordReset()
+
+            ->colors([
+                'primary' => Color::Amber,
+            ])
+
             ->profile()
-            
-            
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+
+            ->discoverResources(
+                in: app_path('Filament/Resources'),
+                for: 'App\\Filament\\Resources'
+            )
+
+            ->discoverPages(
+                in: app_path('Filament/Pages'),
+                for: 'App\\Filament\\Pages'
+            )
+
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+
+            ->discoverWidgets(
+                in: app_path('Filament/Widgets'),
+                for: 'App\\Filament\\Widgets'
+            )
+
             ->widgets([
-               OrdersChart::class,
-               StatsOverview::class,
+                OrdersChart::class,
+                StatsOverview::class,
                 ActiveDokans::class,
             ])
+
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -65,6 +84,7 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+
             ->authMiddleware([
                 Authenticate::class,
             ]);
