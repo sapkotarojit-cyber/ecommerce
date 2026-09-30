@@ -27,21 +27,25 @@
     
     @stack('styles')
 </head>
-<body class="font-sans antialiased bg-[#f8f7f4] min-h-screen flex flex-col justify-between">
-    <div class="min-h-screen flex flex-col">
-        <!-- Header -->
+<body class="font-sans antialiased bg-[#f8f7f4] min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <div class="min-h-screen w-full flex flex-col overflow-x-hidden">
+
         <x-frontend-header/>
-        
-        <!-- Main Content -->
-        <main class="flex-grow mb-auto">
+
+        <main class="flex-grow mb-auto w-full overflow-x-hidden">
+
             @yield('content')
+
             {{ $slot ?? '' }}
+
         </main>
-        
-        <!-- Footer -->
+
         <x-frontend-footer/>
+
     </div>
-    
+
     @stack('scripts')
+
 </body>
 </html>

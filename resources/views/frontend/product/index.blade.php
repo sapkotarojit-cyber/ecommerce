@@ -78,8 +78,8 @@
                     </div>
                     
                     @if($products->count() > 0)
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            @foreach($products as $product)
+                            <div class="grid grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5">
+                                    @foreach($products as $product)
                                 <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group">
                                     <a href="{{ route('product', $product->id) }}">
                                         <div class="relative h-56 bg-gray-100 overflow-hidden">

@@ -1,4 +1,5 @@
 <x-frontend-layout>
+
     <!-- Hero Section -->
     <section class="relative overflow-hidden gradient-bg text-white">
         <div class="absolute inset-0 opacity-10">
