@@ -29,6 +29,9 @@ Route::post('/dokan-registration', [PageController::class, 'dokan_registration_s
     ->middleware('adaptive.rate:sensitive')
     ->name('dokan_registration_submit');
 
+Route::view('/terms-and-conditions', 'frontend.pages.terms')->name('terms');
+Route::view('/privacy-policy', 'frontend.pages.privacy')->name('privacy');
+
 
 /* OAuth */
 

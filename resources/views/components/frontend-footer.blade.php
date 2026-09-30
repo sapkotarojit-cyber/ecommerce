@@ -34,6 +34,9 @@
                     <li><a href="{{ route('home') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">Home</a></li>
                     <li><a href="{{ route('products') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">Products</a></li>
                     <li><a href="{{ route('about') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">About Us</a></li>
+                    <li><a href="{{ route('terms') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors"> Terms & Conditions</a></li>
+                    <li><a href="{{ route('privacy') }}" class="text-white/70 hover:text-[#c9a84c] transition-colors">Privacy Policy</a></li>
+                    
                 </ul>
             </div>
 
