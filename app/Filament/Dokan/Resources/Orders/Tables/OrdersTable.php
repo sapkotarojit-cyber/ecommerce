@@ -15,9 +15,7 @@ class OrdersTable
     {
         return $table
             ->columns([
-
-
-              // Product Image
+                // Product Image
                 ImageColumn::make('product_image')
                     ->label('Image')
                     ->state(function ($record) {
@@ -35,7 +33,6 @@ class OrdersTable
 
                         $images = $variant->images;
 
-                        // If images are stored as JSON/string
                         if (is_string($images)) {
                             $decoded = json_decode($images, true);
 
@@ -84,7 +81,7 @@ class OrdersTable
                     ->numeric()
                     ->sortable(),
 
-                // Status
+                // Order Status
                 TextColumn::make('order_status')
                     ->label('Status')
                     ->badge()
@@ -101,9 +98,14 @@ class OrdersTable
                     ->badge()
                     ->searchable(),
 
+                // Payment Receipt
                 TextColumn::make('payment_receipt')
                     ->label('Payment Receipt')
-                    ->formatStateUsing(fn ($state) => filled($state) ? 'View Receipt' : 'No Receipt')
+                    ->formatStateUsing(
+                        fn ($state) => filled($state)
+                            ? 'View Receipt'
+                            : 'No Receipt'
+                    )
                     ->url(fn ($record) => filled($record->payment_receipt)
                         ? asset('storage/' . $record->payment_receipt)
                         : null)
@@ -120,15 +122,12 @@ class OrdersTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-
             ->filters([
                 //
             ])
-
             ->recordActions([
                 EditAction::make(),
             ])
-
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

@@ -1,70 +1,61 @@
 <?php
 
-namespace App\Http\Controllers\Frontend;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
+use App\Http\Resources\ProductResource;
 use App\Models\Product;
-use App\Models\Category;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
     /**
-     * Display all products on the shop page with filtering and sorting.
+     * Display paginated products.
      */
     public function index(Request $request)
     {
-        $query = Product::with(['dokan', 'varients']);
+        $validated = $this->validateStrict($request, [
+            'page' => [
+                'sometimes',
+                'integer',
+                'min:1',
+            ],
+            'per_page' => [
+                'sometimes',
+                'integer',
+                'min:1',
+                'max:50',
+            ],
+        ]);
 
-        // Filter by Category
-        if ($request->filled('category')) {
-            $query->where('category_id', $request->category);
-        }
+        $perPage = $validated['per_page'] ?? 12;
 
-        // Filter by Price Range (looking at the first variant)
-        if ($request->filled('min_price')) {
-            $query->whereHas('varients', function ($q) use ($request) {
-                $q->where('price', '>=', $request->min_price);
-            });
-        }
+        $products = Product::query()
+            ->with([
+                'category',
+                'dokan',
+                'varients',
+            ])
+            ->latest('products.created_at')
+            ->paginate($perPage);
 
-        if ($request->filled('max_price')) {
-            $query->whereHas('varients', function ($q) use ($request) {
-                $q->where('price', '<=', $request->max_price);
-            });
-        }
-
-        // Sorting
-        if ($request->sort === 'price_asc') {
-            $query->whereHas('varients')->orderBy(
-                \App\Models\Varient::select('price')
-                    ->whereColumn('varients.product_id', 'products.id')
-                    ->limit(1),
-                'asc'
-            );
-        } elseif ($request->sort === 'price_desc') {
-            $query->whereHas('varients')->orderBy(
-                \App\Models\Varient::select('price')
-                    ->whereColumn('varients.product_id', 'products.id')
-                    ->limit(1),
-                'desc'
-            );
-        } else {
-            $query->latest();
-        }
-
-        $products = $query->paginate(12);
-        $categories = Category::all();
-
-        return view('frontend.products', compact('products', 'categories'));
+        return ProductResource::collection($products);
     }
 
     /**
-     * Display single product details.
+     * Display a single product.
      */
-    public function show($id)
+    public function show(int $id): ProductResource
     {
-        $product = Product::with(['dokan', 'varients'])->findOrFail($id);
+        $product = Product::query()
+            ->with([
+                'category',
+                'dokan',
+                'varients',
+            ])
+            ->findOrFail($id);
 
-        return view('frontend.product-details', compact('product'));
+        return new ProductResource($product);
     }
 }

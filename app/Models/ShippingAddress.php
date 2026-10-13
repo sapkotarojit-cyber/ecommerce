@@ -19,6 +19,11 @@ class ShippingAddress extends Model
         'is_default_billing',
     ];
 
+    protected $casts = [
+        'is_default_shipping' => 'boolean',
+        'is_default_billing' => 'boolean',
+    ];
+
     public function orders()
     {
         return $this->hasMany(Order::class);

@@ -11,14 +11,14 @@ use App\Models\ShippingAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
 {
     /**
-     * Select cart items for checkout.
+     * Save the authenticated user's selected cart items.
      */
     public function postCheckoutSelected(Request $request)
     {
@@ -29,7 +29,6 @@ class CheckoutController extends Controller
                 'min:1',
                 'max:100',
             ],
-
             'selected_items.*' => [
                 'required',
                 'integer',
@@ -39,160 +38,118 @@ class CheckoutController extends Controller
             ],
         ]);
 
+        $selectedIds = array_map(
+            'intval',
+            $validated['selected_items']
+        );
+
         $ids = Cart::query()
             ->where('user_id', Auth::id())
-            ->whereIn(
-                'id',
-                $validated['selected_items']
-            )
+            ->whereIn('id', $selectedIds)
             ->pluck('id')
-            ->toArray();
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
         if (
-            count($ids) !==
-            count(
-                array_unique(
-                    $validated['selected_items']
-                )
-            )
+            count($ids) !== count($selectedIds) ||
+            count(array_unique($ids)) !== count($ids)
         ) {
             return redirect()
                 ->route('cart.index')
-                ->with(
-                    'error',
-                    'One or more selected cart items are invalid.'
-                );
+                ->with('error', 'One or more selected cart items are invalid.');
         }
+
+        sort($ids);
 
         session([
             'checkout_cart_ids' => $ids,
         ]);
 
-        return redirect()
-            ->route('orders.checkout');
+        /*
+         * A new selection is a new checkout attempt.
+         * Do not reuse the previous attempt's idempotency marker.
+         */
+        session()->forget([
+            'checkout_pending_group_id',
+            'checkout_pending_cart_ids',
+            'checkout_pending_payment_method',
+        ]);
+
+        return redirect()->route('orders.checkout');
     }
 
     /**
-     * Display checkout page.
+     * Display checkout.
      */
     public function checkout()
     {
         $ids = session('checkout_cart_ids');
 
-        if (
-            !is_array($ids) ||
-            empty($ids)
-        ) {
+        if (! is_array($ids) || $ids === []) {
             return redirect()
                 ->route('cart.index')
-                ->with(
-                    'error',
-                    'Please select items from your cart.'
-                );
+                ->with('error', 'Please select items from your cart.');
         }
 
         $cartItems = Cart::query()
             ->where('user_id', Auth::id())
             ->whereIn('id', $ids)
-            ->with([
-                'product',
-                'varient',
-                'dokan',
-            ])
+            ->with(['product', 'varient', 'dokan'])
             ->get();
 
         if ($cartItems->isEmpty()) {
-            session()->forget(
-                'checkout_cart_ids'
-            );
+            session()->forget([
+                'checkout_cart_ids',
+                'checkout_pending_group_id',
+                'checkout_pending_cart_ids',
+                'checkout_pending_payment_method',
+            ]);
 
             return redirect()
                 ->route('cart.index')
-                ->with(
-                    'error',
-                    'Your selected cart items are empty.'
-                );
+                ->with('error', 'Your selected cart items are empty.');
         }
 
-        $addresses =
-            ShippingAddress::query()
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
-                ->orderByDesc(
-                    'is_default_shipping'
-                )
-                ->latest()
-                ->get();
+        $addresses = ShippingAddress::query()
+            ->where('user_id', Auth::id())
+            ->orderByDesc('is_default_shipping')
+            ->latest()
+            ->get();
 
         $vendorTotal = [];
         $grandTotal = 0.0;
 
         foreach ($cartItems as $item) {
-            if (
-                !$item->varient ||
-                !$item->product
-            ) {
+            if (! $item->product || ! $item->varient) {
                 continue;
             }
 
-            $price =
-                (float) $item->varient->price;
+            $price = (float) $item->varient->price;
+            $discount = max(
+                0,
+                min(100, (float) $item->varient->discount)
+            );
 
-            $discount =
-                max(
-                    0,
-                    min(
-                        100,
-                        (float) $item->varient->discount
-                    )
-                );
-
-            $finalPrice =
-                $price -
-                (
-                    $price *
-                    $discount /
-                    100
-                );
-
-            $quantity =
-                (int) $item->qty;
-
-            $total =
-                $finalPrice *
-                $quantity;
-
-            $dokanId =
-                (int) ($item->dokan_id ?? 0);
+            $finalPrice = $price - ($price * $discount / 100);
+            $quantity = (int) $item->qty;
+            $lineTotal = $finalPrice * $quantity;
+            $dokanId = (int) ($item->dokan_id ?? 0);
 
             if ($dokanId <= 0) {
                 continue;
             }
 
-            if (
-                !isset(
-                    $vendorTotal[$dokanId]
-                )
-            ) {
+            if (! isset($vendorTotal[$dokanId])) {
                 $vendorTotal[$dokanId] = [
-                    'dokan' =>
-                        $item->dokan,
-                    'subtotal' => 0,
+                    'dokan' => $item->dokan,
+                    'subtotal' => 0.0,
                     'items' => [],
                 ];
             }
 
-            $vendorTotal[$dokanId][
-                'subtotal'
-            ] += $total;
-
-            $vendorTotal[$dokanId][
-                'items'
-            ][] = $item;
-
-            $grandTotal += $total;
+            $vendorTotal[$dokanId]['subtotal'] += $lineTotal;
+            $vendorTotal[$dokanId]['items'][] = $item;
+            $grandTotal += $lineTotal;
         }
 
         return view(
@@ -207,7 +164,18 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Create order(s).
+     * Create one order per vendor.
+     *
+     * COD:
+     * - Deduct stock in the transaction.
+     * - Remove purchased cart rows.
+     * - Send order-placed email after successful creation.
+     *
+     * Bank/eSewa:
+     * - Keep cart rows.
+     * - Do not deduct stock here.
+     * - Keep the checkout selection so the customer can continue payment.
+     * - Payment confirmation must finalize stock/cart handling separately.
      */
     public function store(Request $request)
     {
@@ -218,368 +186,279 @@ class CheckoutController extends Controller
                 'min:1',
                 'exists:shipping_addresses,id',
             ],
-
             'payment_method' => [
                 'required',
                 'string',
-                Rule::in([
-                    'cod',
-                    'bank',
-                    'esewa',
-                ]),
+                Rule::in(['cod', 'bank', 'esewa']),
             ],
         ]);
 
-        $ids = session(
-            'checkout_cart_ids'
-        );
+        $userId = (int) Auth::id();
+        $ids = session('checkout_cart_ids');
 
-        if (
-            !is_array($ids) ||
-            empty($ids)
-        ) {
+        if (! is_array($ids) || $ids === []) {
             return redirect()
                 ->route('cart.index')
-                ->with(
-                    'error',
-                    'Please select items first.'
-                );
+                ->with('error', 'Please select items first.');
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        if (
+            count($ids) > 100 ||
+            in_array(0, $ids, true) ||
+            min($ids) < 1
+        ) {
+            session()->forget('checkout_cart_ids');
+
+            return redirect()
+                ->route('cart.index')
+                ->with('error', 'Your checkout selection is invalid. Please select your items again.');
+        }
+
+        sort($ids);
+
+        $address = ShippingAddress::query()
+            ->whereKey($validated['shipping_address_id'])
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $address) {
+            return redirect()
+                ->route('orders.checkout')
+                ->with('error', 'The selected shipping address is invalid.');
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Validate shipping address ownership
-        |--------------------------------------------------------------------------
-        */
+         * Reuse an existing pending online checkout when the customer
+         * resubmits the same selection in the same session.
+         *
+         * This prevents ordinary double-clicks and refresh resubmissions
+         * from creating another set of pending orders.
+         */
+        if ($validated['payment_method'] !== 'cod') {
+            $existingGroupId = (string) session(
+                'checkout_pending_group_id',
+                ''
+            );
 
-        $address =
-            ShippingAddress::query()
-                ->whereKey(
-                    $validated[
-                        'shipping_address_id'
-                    ]
-                )
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
-                ->first();
+            $existingCartIds = session(
+                'checkout_pending_cart_ids',
+                []
+            );
 
-        if (!$address) {
-            return redirect()
-                ->route('orders.checkout')
-                ->with(
-                    'error',
-                    'The selected shipping address is invalid.'
-                );
+            $existingMethod = (string) session(
+                'checkout_pending_payment_method',
+                ''
+            );
+
+            if (
+                $existingGroupId !== '' &&
+                is_array($existingCartIds) &&
+                $existingMethod === $validated['payment_method'] &&
+                $this->sameIds($ids, $existingCartIds)
+            ) {
+                $existingOrders = Order::query()
+                    ->where('user_id', $userId)
+                    ->where('payment_group_id', $existingGroupId)
+                    ->where('payment_method', $validated['payment_method'])
+                    ->where('payment_status', 'pending')
+                    ->orderBy('id')
+                    ->get();
+
+                if ($existingOrders->isNotEmpty()) {
+                    return $this->redirectToPayment(
+                        $validated['payment_method'],
+                        $existingOrders->first()->id
+                    );
+                }
+            }
         }
 
         try {
-            $orders = DB::transaction(
-                function () use (
-                    $ids,
-                    $address,
-                    $validated
+            $orders = DB::transaction(function () use (
+                $ids,
+                $address,
+                $validated,
+                $userId
+            ) {
+                $items = Cart::query()
+                    ->where('user_id', $userId)
+                    ->whereIn('id', $ids)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->with(['product', 'varient', 'dokan'])
+                    ->get();
+
+                if (
+                    $items->count() !== count($ids) ||
+                    $items->isEmpty()
                 ) {
-                    $items =
-                        Cart::query()
-                            ->where(
-                                'user_id',
-                                Auth::id()
-                            )
-                            ->whereIn(
-                                'id',
-                                $ids
-                            )
-                            ->lockForUpdate()
-                            ->with([
-                                'product',
-                                'varient',
-                                'dokan',
-                            ])
-                            ->get();
+                    throw new \RuntimeException(
+                        'One or more selected cart items are no longer available. Please review your cart.'
+                    );
+                }
 
-                    $requestedCount =
-                        count(
-                            array_unique(
-                                array_map(
-                                    'intval',
-                                    $ids
-                                )
-                            )
-                        );
+                $paymentGroupId = (string) Str::uuid();
 
-                    if (
-                        $items->count() !==
-                        $requestedCount
-                    ) {
+                $itemsByVendor = $items->groupBy(
+                    fn ($item) => (string) ($item->dokan_id ?? 0)
+                );
+
+                $createdOrders = [];
+
+                foreach ($itemsByVendor as $dokanId => $vendorItems) {
+                    $dokanId = (int) $dokanId;
+
+                    if ($dokanId < 1) {
                         throw new \RuntimeException(
-                            'One or more selected cart items are invalid.'
+                            'One or more products do not have a valid vendor.'
                         );
                     }
 
-                    if (
-                        $items->isEmpty()
-                    ) {
-                        throw new \RuntimeException(
-                            'Your selected cart items are empty.'
-                        );
-                    }
+                    $total = 0.0;
+                    $lockedVariants = [];
 
                     /*
-                    |--------------------------------------------------------------------------
-                    | Group by vendor
-                    |--------------------------------------------------------------------------
-                    */
+                     * Lock and validate each variant before creating its order.
+                     */
+                    foreach ($vendorItems as $item) {
+                        if (
+                            ! is_numeric($item->qty) ||
+                            (int) $item->qty < 1 ||
+                            (int) $item->qty > 100
+                        ) {
+                            throw new \RuntimeException(
+                                'One or more cart quantities are invalid.'
+                            );
+                        }
 
-                    $itemsByVendor =
-                        $items->groupBy(
-                            fn ($item) =>
-                                (string)
-                                ($item->dokan_id ?? 0)
+                        if (! $item->product || ! $item->varient) {
+                            throw new \RuntimeException(
+                                'A selected product or variant is no longer available.'
+                            );
+                        }
+
+                        $quantity = (int) $item->qty;
+
+                        $variant = ProductVarient::query()
+                            ->whereKey($item->varient_id)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if (!$variant) {
+                            throw new \RuntimeException(
+                                'A selected product variant could not be found.'
+                            );
+                        }
+
+                        if (
+                            (int) $variant->product_id !==
+                            (int) $item->product_id
+                        ) {
+                            throw new \RuntimeException(
+                                'Invalid product configuration detected.'
+                            );
+                        }
+
+                        if ((int) $variant->qty < $quantity) {
+                            $productName = $item->product->title ?: 'Product';
+
+                            throw new \RuntimeException(
+                                "{$productName} does not have enough stock. "
+                                . "Only {$variant->qty} available."
+                            );
+                        }
+
+                        $price = (float) $variant->price;
+
+                        if (! is_finite($price) || $price < 0) {
+                            throw new \RuntimeException(
+                                'A selected product has an invalid price.'
+                            );
+                        }
+
+                        $discount = max(
+                            0,
+                            min(100, (float) $variant->discount)
                         );
 
-                    $createdOrders = [];
+                        $finalPrice = $price - ($price * $discount / 100);
+                        $lineTotal = round($finalPrice * $quantity, 2);
 
-                    foreach (
-                        $itemsByVendor
-                        as $dokanId =>
-                        $vendorItems
-                    ) {
-                        $dokanId =
-                            (int) $dokanId;
+                        $total += $lineTotal;
 
-                        if (
-                            $dokanId <= 0
-                        ) {
-                            throw new \RuntimeException(
-                                'One or more products do not have a valid vendor.'
-                            );
-                        }
+                        $lockedVariants[$item->id] = [
+                            'variant' => $variant,
+                            'quantity' => $quantity,
+                            'final_price' => $finalPrice,
+                        ];
+                    }
 
-                        $total = 0.0;
+                    $total = round($total, 2);
 
-                        $lockedVariants = [];
+                    if (! is_finite($total) || $total <= 0) {
+                        throw new \RuntimeException(
+                            'Order total must be greater than zero.'
+                        );
+                    }
 
-                        foreach (
-                            $vendorItems
-                            as $item
-                        ) {
-                            if (
-                                !is_numeric(
-                                    $item->qty
-                                ) ||
-                                (int) $item->qty < 1 ||
-                                (int) $item->qty > 100
-                            ) {
-                                throw new \RuntimeException(
-                                    'Invalid cart quantity.'
-                                );
-                            }
+                    $order = Order::create([
+                        'user_id' => $userId,
+                        'dokan_id' => $dokanId,
+                        'shipping_address_id' => $address->id,
+                        'total_amount' => $total,
+                        'status' => 'pending',
+                        'order_status' => 'pending',
+                        'payment_method' => $validated['payment_method'],
+                        'payment_status' => 'pending',
+                        'payment_group_id' => $paymentGroupId,
+                    ]);
 
-                            $quantity =
-                                (int) $item->qty;
+                    foreach ($vendorItems as $item) {
+                        $locked = $lockedVariants[$item->id];
 
-                            $variant =
-                                ProductVarient::query()
-                                    ->whereKey(
-                                        $item->varient_id
-                                    )
-                                    ->lockForUpdate()
-                                    ->first();
+                        /** @var ProductVarient $variant */
+                        $variant = $locked['variant'];
+                        $quantity = $locked['quantity'];
+                        $finalPrice = $locked['final_price'];
 
-                            if (!$variant) {
-                                throw new \RuntimeException(
-                                    'Product variant not found.'
-                                );
-                            }
-
-                            /*
-                            |--------------------------------------------------------------------------
-                            | Product ownership/integrity
-                            |--------------------------------------------------------------------------
-                            */
-
-                            if (
-                                (int)
-                                    $variant->product_id !==
-                                (int)
-                                    $item->product_id
-                            ) {
-                                throw new \RuntimeException(
-                                    'Invalid product configuration detected.'
-                                );
-                            }
-
-                            if (
-                                $variant->qty <
-                                $quantity
-                            ) {
-                                $productName =
-                                    $item->product?->title
-                                    ?? 'Product';
-
-                                throw new \RuntimeException(
-                                    "{$productName} does not have enough stock. "
-                                    . "Only {$variant->qty} available."
-                                );
-                            }
-
-                            $price =
-                                (float)
-                                $variant->price;
-
-                            $discount =
-                                max(
-                                    0,
-                                    min(
-                                        100,
-                                        (float)
-                                        $variant->discount
-                                    )
-                                );
-
-                            if (
-                                $price < 0
-                            ) {
-                                throw new \RuntimeException(
-                                    'Invalid product price.'
-                                );
-                            }
-
-                            $finalPrice =
-                                $price -
-                                (
-                                    $price *
-                                    $discount /
-                                    100
-                                );
-
-                            $lineTotal =
-                                $finalPrice *
-                                $quantity;
-
-                            $total +=
-                                $lineTotal;
-
-                            $lockedVariants[
-                                $item->id
-                            ] = [
-                                'variant' =>
-                                    $variant,
-                                'final_price' =>
-                                    $finalPrice,
-                            ];
-                        }
-
-                        $total =
-                            round(
-                                $total,
+                        $order->orderItems()->create([
+                            'product_id' => $item->product_id,
+                            'varient_id' => $item->varient_id,
+                            'qty' => $quantity,
+                            'amount' => round(
+                                $finalPrice * $quantity,
                                 2
-                            );
-
-                        if (
-                            $total <= 0
-                        ) {
-                            throw new \RuntimeException(
-                                'Order total must be greater than zero.'
-                            );
-                        }
+                            ),
+                        ]);
 
                         /*
-                        |--------------------------------------------------------------------------
-                        | Create vendor order
-                        |--------------------------------------------------------------------------
-                        */
+                         * Only COD finalizes stock/cart during checkout.
+                         * Online payment is finalized after gateway/admin
+                         * verification in the corresponding payment handler.
+                         */
+                        if ($validated['payment_method'] === 'cod') {
+                            $updated = ProductVarient::query()
+                                ->whereKey($variant->id)
+                                ->where('qty', '>=', $quantity)
+                                ->decrement('qty', $quantity);
 
-                        $order =
-                            Order::create([
-                                'user_id' =>
-                                    Auth::id(),
-
-                                'dokan_id' =>
-                                    $dokanId,
-
-                                'shipping_address_id' =>
-                                    $address->id,
-
-                                'total_amount' =>
-                                    $total,
-
-                                'status' =>
-                                    'pending',
-
-                                'order_status' =>
-                                    'pending',
-
-                                'payment_method' =>
-                                    $validated[
-                                        'payment_method'
-                                    ],
-
-                                'payment_status' =>
-                                    'pending',
-                            ]);
-
-                        foreach (
-                            $vendorItems
-                            as $item
-                        ) {
-                            $locked =
-                                $lockedVariants[
-                                    $item->id
-                                ];
-
-                            /** @var ProductVarient $variant */
-                            $variant =
-                                $locked[
-                                    'variant'
-                                ];
-
-                            $finalPrice =
-                                (float)
-                                $locked[
-                                    'final_price'
-                                ];
-
-                            $quantity =
-                                (int) $item->qty;
-
-                            $order
-                                ->orderItems()
-                                ->create([
-                                    'product_id' =>
-                                        $item->product_id,
-
-                                    'varient_id' =>
-                                        $item->varient_id,
-
-                                    'qty' =>
-                                        $quantity,
-
-                                    'amount' =>
-                                        round(
-                                            $finalPrice *
-                                            $quantity,
-                                            2
-                                        ),
-                                ]);
-
-                            $variant->decrement(
-                                'qty',
-                                $quantity
-                            );
+                            if ($updated !== 1) {
+                                throw new \RuntimeException(
+                                    'Stock changed during checkout. Please review your cart and try again.'
+                                );
+                            }
 
                             $item->delete();
                         }
-
-                        $createdOrders[] =
-                            $order;
                     }
 
-                    return $createdOrders;
+                    $createdOrders[] = $order;
                 }
-            );
+
+                return $createdOrders;
+            });
         } catch (\Throwable $e) {
             report($e);
 
@@ -593,81 +472,106 @@ class CheckoutController extends Controller
                 );
         }
 
-        session()->forget(
-            'checkout_cart_ids'
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Order confirmation emails
-        |--------------------------------------------------------------------------
-        */
-
-        foreach ($orders as $order) {
-            $order->load([
-                'user',
-                'dokan',
-                'shippingAddress',
-                'orderItems.product',
-                'orderItems.varient',
-            ]);
-
-            if (
-                $order->user &&
-                filter_var(
-                    $order->user->email,
-                    FILTER_VALIDATE_EMAIL
-                )
-            ) {
-                try {
-                    Mail::to(
-                        $order->user->email
-                    )->send(
-                        new OrderPlacedMail(
-                            $order
-                        )
-                    );
-                } catch (\Throwable $e) {
-                    report($e);
-                }
-            }
+        if ($orders === []) {
+            return redirect()
+                ->route('orders.checkout')
+                ->with('error', 'No orders were created. Please try again.');
         }
 
+        $order = $orders[0];
+
         /*
-        |--------------------------------------------------------------------------
-        | Multiple vendor orders
-        |--------------------------------------------------------------------------
-        */
+         * COD has been finalized in the transaction. Send emails only after
+         * the transaction commits; a mail failure must not undo the order.
+         */
+        if ($validated['payment_method'] === 'cod') {
+            session()->forget([
+                'checkout_cart_ids',
+                'checkout_pending_group_id',
+                'checkout_pending_cart_ids',
+                'checkout_pending_payment_method',
+            ]);
 
-                $order = $orders[0];
+            foreach ($orders as $placedOrder) {
+                $placedOrder->load([
+                    'user',
+                    'dokan',
+                    'shippingAddress',
+                    'orderItems.product',
+                    'orderItems.varient',
+                ]);
 
-
-                if ($validated['payment_method'] === 'esewa') {
-                    return redirect()->route('orders.esewa.pay', $order->id);
+                if (
+                    $placedOrder->user &&
+                    filter_var(
+                        $placedOrder->user->email,
+                        FILTER_VALIDATE_EMAIL
+                    )
+                ) {
+                    try {
+                        Mail::to($placedOrder->user->email)
+                            ->send(new OrderPlacedMail($placedOrder));
+                    } catch (\Throwable $e) {
+                        report($e);
+                    }
                 }
-
-            if ($validated['payment_method'] === 'bank') {
-                $groupId = (string) Str::uuid();
-
-                Order::whereIn('id', collect($orders)->pluck('id'))
-                    ->update(['payment_group_id' => $groupId]);
-
-                return redirect()->route('orders.bank.pay', $order->id);
             }
 
             if (count($orders) > 1) {
-                return redirect()->route('orders.index')
-                    ->with('success', 'Your orders were placed successfully.');
+                return redirect()
+                    ->route('orders.index')
+                    ->with('success', 'Your COD orders were placed successfully.');
             }
 
-        return redirect()
-            ->route(
-                'orders.show',
-                $order->id
-            )
-            ->with(
-                'success',
-                'Order placed successfully with Cash on Delivery.'
-            );
+            return redirect()
+                ->route('orders.show', $order->id)
+                ->with('success', 'Order placed successfully with Cash on Delivery.');
+        }
+
+        /*
+         * Preserve cart rows, stock, and checkout selection for online payment.
+         * Keep a session marker so resubmitting the same checkout redirects
+         * to the existing pending group instead of creating another group.
+         */
+        session([
+            'checkout_pending_group_id' => (string) $order->payment_group_id,
+            'checkout_pending_cart_ids' => $ids,
+            'checkout_pending_payment_method' => $validated['payment_method'],
+        ]);
+
+        return $this->redirectToPayment(
+            $validated['payment_method'],
+            $order->id
+        );
+    }
+
+    /**
+     * Redirect to the appropriate payment page.
+     */
+    private function redirectToPayment(string $paymentMethod, int $orderId)
+    {
+        if ($paymentMethod === 'esewa') {
+            return redirect()->route('orders.esewa.pay', $orderId);
+        }
+
+        if ($paymentMethod === 'bank') {
+            return redirect()->route('orders.bank.pay', $orderId);
+        }
+
+        return redirect()->route('orders.show', $orderId);
+    }
+
+    /**
+     * Compare selected cart IDs without relying on order.
+     */
+    private function sameIds(array $first, array $second): bool
+    {
+        $first = array_values(array_unique(array_map('intval', $first)));
+        $second = array_values(array_unique(array_map('intval', $second)));
+
+        sort($first);
+        sort($second);
+
+        return $first === $second;
     }
 }

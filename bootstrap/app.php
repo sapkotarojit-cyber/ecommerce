@@ -10,6 +10,7 @@ return Application::configure(
 )
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../console.php',
         health: '/up',
     )

@@ -13,15 +13,7 @@ class AdaptiveRateLimit
      * Apply configurable IP/account rate limits
      * with exponential backoff.
      *
-     * There is no permanent account lockout.
-     *
-     * Authentication endpoints can therefore use:
-     *
-     * - per-IP limits
-     * - per-account limits
-     * - exponential backoff
-     *
-     * without permanently locking an account.
+     * No permanent account lockout is used.
      */
     public function handle(
         Request $request,
@@ -33,7 +25,7 @@ class AdaptiveRateLimit
         );
 
         /*
-         * Unknown limiter configuration should not
+         * Unknown limiter configuration should never
          * break the application.
          */
         if (!is_array($config)) {
@@ -62,10 +54,13 @@ class AdaptiveRateLimit
      *
      * IP is always tracked.
      *
-     * Email/account is tracked whenever a valid email
-     * is available.
+     * Account is tracked using:
      *
-     * Raw email addresses are never stored in rate-limit keys.
+     * - authenticated user
+     * - submitted email
+     * - pending verification user
+     *
+     * Raw email addresses are never stored in limiter keys.
      *
      * @return array<int, array{kind:string,value:string}>
      */
@@ -76,15 +71,20 @@ class AdaptiveRateLimit
         $identifiers = [];
 
         /*
-         * ---------------------------------------------------------
-         * IP identifier
-         * ---------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | IP
+        |--------------------------------------------------------------------------
+        */
+
         $ip = $request->ip();
 
-        if (is_string($ip) && $ip !== '') {
+        if (
+            is_string($ip) &&
+            $ip !== ''
+        ) {
             $identifiers[] = [
                 'kind' => 'ip',
+
                 'value' => hash(
                     'sha256',
                     $ip
@@ -93,23 +93,39 @@ class AdaptiveRateLimit
         }
 
         /*
-         * ---------------------------------------------------------
-         * Authenticated account identifier
-         * ---------------------------------------------------------
-         *
-         * Sensitive authenticated endpoints usually do not submit an
-         * email address. Bind their account bucket to the authenticated
-         * principal so the account limit is actually enforced.
-         */
-        foreach (['web', 'dokan', 'admin'] as $guard) {
-            $guardUser = auth()->guard($guard)->user();
+        |--------------------------------------------------------------------------
+        | Authenticated account
+        |--------------------------------------------------------------------------
+        |
+        | Include Sanctum because the API uses auth:sanctum.
+        |
+        */
 
-            if ($guardUser && $guardUser->getAuthIdentifier() !== null) {
+        foreach (
+            [
+                'sanctum',
+                'web',
+                'dokan',
+                'admin',
+            ] as $guard
+        ) {
+            $guardUser = auth()
+                ->guard($guard)
+                ->user();
+
+            if (
+                $guardUser &&
+                $guardUser->getAuthIdentifier() !== null
+            ) {
                 $identifiers[] = [
                     'kind' => 'account',
+
                     'value' => hash(
                         'sha256',
-                        $guard . ':user:' . (string) $guardUser->getAuthIdentifier()
+                        $guard
+                        . ':user:'
+                        . (string) $guardUser
+                            ->getAuthIdentifier()
                     ),
                 ];
 
@@ -118,10 +134,11 @@ class AdaptiveRateLimit
         }
 
         /*
-         * ---------------------------------------------------------
-         * Email/account identifier
-         * ---------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | Submitted email
+        |--------------------------------------------------------------------------
+        */
+
         $email = strtolower(
             trim(
                 (string) $request->input('email')
@@ -137,25 +154,26 @@ class AdaptiveRateLimit
         ) {
             $identifiers[] = [
                 'kind' => 'account',
+
                 'value' => hash(
                     'sha256',
-                    $email
+                    'email:' . $email
                 ),
             ];
         }
 
         /*
-         * ---------------------------------------------------------
-         * Pending verification account
-         * ---------------------------------------------------------
-         *
-         * Verification can use the pending user ID when the
-         * request does not contain an email field.
-         */
+        |--------------------------------------------------------------------------
+        | Pending verification account
+        |--------------------------------------------------------------------------
+        */
+
         if (
             $type === 'verification' &&
             $request->hasSession() &&
-            $request->session()->has('pending_user_id')
+            $request->session()->has(
+                'pending_user_id'
+            )
         ) {
             $pendingUserId =
                 $request->session()->get(
@@ -171,19 +189,22 @@ class AdaptiveRateLimit
             ) {
                 $identifiers[] = [
                     'kind' => 'account',
+
                     'value' => hash(
                         'sha256',
-                        'user:' . (string) $pendingUserId
+                        'user:'
+                        . (string) $pendingUserId
                     ),
                 ];
             }
         }
 
         /*
-         * ---------------------------------------------------------
-         * Remove duplicate identifiers
-         * ---------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | Remove duplicates
+        |--------------------------------------------------------------------------
+        */
+
         $unique = [];
 
         foreach ($identifiers as $identifier) {
@@ -199,7 +220,7 @@ class AdaptiveRateLimit
     }
 
     /**
-     * Enforce a single IP/account limit.
+     * Enforce one IP/account limiter.
      *
      * @param array<string,mixed> $config
      * @param array{kind:string,value:string} $identifier
@@ -216,8 +237,8 @@ class AdaptiveRateLimit
         $limit = $config[$kind] ?? null;
 
         /*
-         * Some limiter types may intentionally have
-         * only an IP configuration.
+         * This limiter type may intentionally have
+         * only one identifier type.
          */
         if (
             !is_array($limit) ||
@@ -254,10 +275,11 @@ class AdaptiveRateLimit
             $prefix . ':cooldown';
 
         /*
-         * ---------------------------------------------------------
-         * Active exponential cooldown
-         * ---------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | Existing cooldown
+        |--------------------------------------------------------------------------
+        */
+
         $cooldownRemaining =
             RateLimiter::availableIn(
                 $cooldownKey
@@ -271,46 +293,50 @@ class AdaptiveRateLimit
         }
 
         /*
-         * ---------------------------------------------------------
-         * Current request window
-         * ---------------------------------------------------------
-         */
+        |--------------------------------------------------------------------------
+        | Current request window
+        |--------------------------------------------------------------------------
+        */
+
         $attempts =
             RateLimiter::attempts(
                 $attemptKey
             );
 
-if ($attempts >= $maxAttempts) {
+        if ($attempts >= $maxAttempts) {
 
-    $backoff = $this->createBackoff(
-        config: $config,
-        violationKey: $violationKey,
-        decaySeconds: $decaySeconds
-    );
+            $backoff = $this->createBackoff(
+                config: $config,
+                violationKey: $violationKey,
+                decaySeconds: $decaySeconds
+            );
 
-    /*
-     * Clear the exhausted request window.
-     *
-     * Otherwise, after the cooldown expires,
-     * the same attempts count immediately triggers
-     * another cooldown.
-     */
-    RateLimiter::clear($attemptKey);
+            /*
+             * Clear exhausted window so that after
+             * cooldown expires the request gets a
+             * fresh window.
+             */
+            RateLimiter::clear(
+                $attemptKey
+            );
 
-    RateLimiter::hit(
-        $cooldownKey,
-        $backoff
-    );
+            RateLimiter::hit(
+                $cooldownKey,
+                $backoff
+            );
 
-    $this->reject(
-        $request,
-        $backoff
-    );
-}
+            $this->reject(
+                $request,
+                $backoff
+            );
+        }
 
         /*
-         * Count the current request.
-         */
+        |--------------------------------------------------------------------------
+        | Count current request
+        |--------------------------------------------------------------------------
+        */
+
         RateLimiter::hit(
             $attemptKey,
             $decaySeconds
@@ -320,16 +346,14 @@ if ($attempts >= $maxAttempts) {
     /**
      * Calculate exponential backoff.
      *
-     * Example:
-     *
      * base = 5
      *
-     * violation 1 = 5 seconds
-     * violation 2 = 10 seconds
-     * violation 3 = 20 seconds
-     * violation 4 = 40 seconds
+     * violation 0 = 5 seconds
+     * violation 1 = 10 seconds
+     * violation 2 = 20 seconds
+     * violation 3 = 40 seconds
      *
-     * until the configured maximum is reached.
+     * capped by configured maximum.
      *
      * @param array<string,mixed> $config
      */
@@ -369,18 +393,13 @@ if ($attempts >= $maxAttempts) {
             )
         );
 
-        /*
-         * Number of previous violations within the
-         * configured violation window.
-         */
         $violations =
             RateLimiter::attempts(
                 $violationKey
             );
 
         /*
-         * Prevent integer overflow from malicious or
-         * corrupted limiter state.
+         * Prevent integer overflow.
          */
         $exponent = min(
             30,
@@ -412,22 +431,29 @@ if ($attempts >= $maxAttempts) {
         );
     }
 
-        /**
-     * Return a consistent HTTP 429 response.
-     *
-     * This method always aborts the request and therefore never returns.
+    /**
+     * Return consistent HTTP 429 response.
      */
     private function reject(
         Request $request,
         int $retryAfter
     ): never {
-        $retryAfter = max(1, $retryAfter);
+        $retryAfter = max(
+            1,
+            $retryAfter
+        );
 
-        if ($request->expectsJson() || $request->ajax()) {
+        if (
+            $request->expectsJson() ||
+            $request->ajax()
+        ) {
             abort(
                 response()->json([
-                    'message' => 'Too many requests. Please try again later.',
-                    'retry_after' => $retryAfter,
+                    'message' =>
+                        'Too many requests. Please try again later.',
+
+                    'retry_after' =>
+                        $retryAfter,
                 ], 429)->header(
                     'Retry-After',
                     (string) $retryAfter
@@ -437,9 +463,14 @@ if ($attempts >= $maxAttempts) {
 
         abort(
             response()
-                ->view('errors.429', [
-                    'retryAfter' => $retryAfter,
-                ], 429)
+                ->view(
+                    'errors.429',
+                    [
+                        'retryAfter' =>
+                            $retryAfter,
+                    ],
+                    429
+                )
                 ->header(
                     'Retry-After',
                     (string) $retryAfter
@@ -447,4 +478,3 @@ if ($attempts >= $maxAttempts) {
         );
     }
 }
-

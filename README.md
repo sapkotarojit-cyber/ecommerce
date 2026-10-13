@@ -1,7 +1,3 @@
-send email notification from order placed to checkout all process 
-
-use project-tree.txt 
-
-at first check from login to lout all part 
+vendor bata pani admin bata pani payement status change garnu mile hunu paryo ani wb ma yedi checkout garda gardai payement bina back vayo vane product cart ma gayara basnu paryo and order placed vanyara msg janu vayana 
 
 aaru samjidai garumla byee

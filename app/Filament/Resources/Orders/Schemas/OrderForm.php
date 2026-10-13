@@ -82,15 +82,15 @@ class OrderForm
                     ])
                     ->required(),
 
-                Select::make('payment_status')
-                    ->label('Payment Status')
-                    ->options([
-                        'pending' => 'Pending Verification',
-                        'paid' => 'Paid',
-                        'failed' => 'Failed',
-                    ])
-                    ->default('pending')
-                    ->required(),
+                    Select::make('payment_status')
+                        ->label('Payment Status')
+                        ->options([
+                            'pending' => 'Pending',
+                            'paid' => 'Paid',
+                            'failed' => 'Failed',
+                        ])
+                        ->default('pending')
+                        ->required(),
 
                FileUpload::make('payment_receipt')
                     ->label('Payment Receipt')

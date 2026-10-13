@@ -12,31 +12,25 @@ abstract class Controller
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
-    /**
-     * Validate a request while rejecting unexpected top-level fields.
-     *
-     * Laravel's normal validate() method validates known fields but ignores
-     * extra input. Security-sensitive endpoints should instead reject any
-     * field that is not explicitly part of their schema.
-     */
-    protected function validateStrict(Request $request, array $rules, array $allowedExtra = []): array
-    {
-        $allowed = [
-            '_token',
-            '_method',
-            ...$allowedExtra,
-        ];
+    protected function validateStrict(
+        Request $request,
+        array $rules,
+        array $extra = []
+    ): array {
+        $allowed = ['_token', '_method', ...$extra];
 
         foreach (array_keys($rules) as $field) {
             $allowed[] = explode('.', $field, 2)[0];
         }
 
-        $allowed = array_values(array_unique($allowed));
-        $unexpected = array_values(array_diff(array_keys($request->all()), $allowed));
+        $unexpected = array_diff(
+            array_keys($request->all()),
+            array_unique($allowed)
+        );
 
-        if ($unexpected !== []) {
+        if ($unexpected) {
             throw ValidationException::withMessages([
-                'request' => 'The request contains unsupported fields: ' . implode(', ', $unexpected),
+                'request' => 'Unsupported field(s): ' . implode(', ', $unexpected),
             ]);
         }
 

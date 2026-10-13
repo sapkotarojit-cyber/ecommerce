@@ -4,27 +4,21 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Models\ShippingAddress;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class ShippingAddressController extends Controller
 {
     public function index()
     {
-        $addresses =
-            ShippingAddress::query()
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
-                ->orderByDesc(
-                    'is_default_shipping'
-                )
-                ->latest()
-                ->paginate(9);
+        $addresses = ShippingAddress::query()
+            ->where('user_id', Auth::id())
+            ->orderByDesc('is_default_shipping')
+            ->latest()
+            ->paginate(9);
 
         return view(
             'frontend.shipping-address.index',
@@ -41,237 +35,214 @@ class ShippingAddressController extends Controller
 
     public function store(Request $request)
     {
-        $validated =
-            $this->validateStrict($request, [
-                'name' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:100',
-                    'regex:/^[\pL\pM\pN .\'-]+$/u',
-                ],
+        $validated = $this->validateStrict($request, [
+            'name' => [
+                'bail',
+                'required',
+                'string',
+                'min:2',
+                'max:100',
+                'regex:/^[\pL\pM\pN .\'-]+$/u',
+            ],
 
-                'phone' => [
-                    'required',
-                    'string',
-                    'min:7',
-                    'max:20',
-                ],
+            'phone' => [
+                'bail',
+                'required',
+                'string',
+                'min:7',
+                'max:20',
+                'regex:/^[0-9+\-\s()]+$/',
+            ],
 
-                'region' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:255',
-                ],
+            'region' => [
+                'bail',
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
 
-                'address' => [
-                    'required',
-                    'string',
-                    'min:5',
-                    'max:500',
-                ],
+            'address' => [
+                'bail',
+                'required',
+                'string',
+                'min:5',
+                'max:500',
+            ],
 
-                'landmark' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
+            'landmark' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-                'address_type' => [
-                    'required',
-                    'string',
-                    Rule::in([
-                        'Home',
-                        'Office',
-                    ]),
-                ],
+            'address_type' => [
+                'required',
+                'string',
+                Rule::in([
+                    'Home',
+                    'Office',
+                ]),
+            ],
 
-                'is_default_shipping' => [
-                    'sometimes',
-                    'boolean',
-                ],
+            'is_default_shipping' => [
+                'sometimes',
+                'boolean',
+            ],
 
-                'is_default_billing' => [
-                    'sometimes',
-                    'boolean',
-                ],
+            'is_default_billing' => [
+                'sometimes',
+                'boolean',
+            ],
+        ]);
+
+        $address = DB::transaction(function () use ($validated) {
+
+            /*
+             * Lock the authenticated user row.
+             *
+             * This serializes address/default mutations for the
+             * same user and prevents two concurrent requests from
+             * creating conflicting defaults.
+             */
+            User::query()
+                ->whereKey(Auth::id())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $makeDefault = (bool) (
+                $validated['is_default_shipping'] ?? false
+            );
+
+            if ($makeDefault) {
+                ShippingAddress::query()
+                    ->where('user_id', Auth::id())
+                    ->update([
+                        'is_default_shipping' => false,
+                    ]);
+            }
+
+            $address = ShippingAddress::create([
+                'user_id' => Auth::id(),
+
+                'name' => trim($validated['name']),
+
+                'phone' => trim($validated['phone']),
+
+                'region' => trim($validated['region']),
+
+                'address' => trim($validated['address']),
+
+                'landmark' => isset($validated['landmark'])
+                    ? trim($validated['landmark'])
+                    : null,
+
+                'address_type' => $validated['address_type'],
+
+                'is_default_shipping' => $makeDefault,
+
+                'is_default_billing' => (bool) (
+                    $validated['is_default_billing'] ?? false
+                ),
             ]);
 
-        $address =
-            ShippingAddress::create([
-                'user_id' =>
-                    Auth::id(),
-
-                'name' =>
-                    trim($validated['name']),
-
-                'phone' =>
-                    trim($validated['phone']),
-
-                'region' =>
-                    trim($validated['region']),
-
-                'address' =>
-                    trim($validated['address']),
-
-                'landmark' =>
-                    isset(
-                        $validated['landmark']
-                    )
-                        ? trim(
-                            $validated['landmark']
-                        )
-                        : null,
-
-                'address_type' =>
-                    $validated[
-                        'address_type'
-                    ],
-
-                'is_default_shipping' =>
-                    (bool) (
-                        $validated[
-                            'is_default_shipping'
-                        ] ?? false
-                    ),
-
-                'is_default_billing' =>
-                    (bool) (
-                        $validated[
-                            'is_default_billing'
-                        ] ?? false
-                    ),
-            ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Maintain one default shipping address
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            $address->is_default_shipping
-        ) {
-            ShippingAddress::query()
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
-                ->whereKeyNot(
-                    $address->id
-                )
-                ->update([
-                    'is_default_shipping' =>
-                        false,
+            /*
+             * If this is the user's first address, it becomes
+             * the default shipping address automatically.
+             */
+            if (
+                !ShippingAddress::query()
+                    ->where('user_id', Auth::id())
+                    ->where('is_default_shipping', true)
+                    ->exists()
+            ) {
+                $address->update([
+                    'is_default_shipping' => true,
                 ]);
-        }
+            }
 
-        /*
-        |--------------------------------------------------------------------------
-        | First address becomes default
-        |--------------------------------------------------------------------------
-        */
-
-        if (
-            !ShippingAddress::query()
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
-                ->where(
-                    'is_default_shipping',
-                    true
-                )
-                ->exists()
-        ) {
-            $address->update([
-                'is_default_shipping' =>
-                    true,
-            ]);
-        }
+            return $address;
+        });
 
         return redirect()
-            ->route(
-                'shipping-address.index'
-            )
+            ->route('shipping-address.index')
             ->with(
                 'success',
                 'Shipping address added successfully!'
             );
     }
 
-    public function quickStore(
-        Request $request
-    ) {
-        $validated =
-            $this->validateStrict($request, [
-                'name' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:100',
-                    'regex:/^[\pL\pM\pN .\'-]+$/u',
-                ],
+    public function quickStore(Request $request)
+    {
+        $validated = $this->validateStrict($request, [
+            'name' => [
+                'bail',
+                'required',
+                'string',
+                'min:2',
+                'max:100',
+                'regex:/^[\pL\pM\pN .\'-]+$/u',
+            ],
 
-                'address_type' => [
-                    'required',
-                    'string',
-                    Rule::in([
-                        'Home',
-                        'Office',
-                    ]),
-                ],
+            'address_type' => [
+                'required',
+                'string',
+                Rule::in([
+                    'Home',
+                    'Office',
+                ]),
+            ],
 
-                'phone' => [
-                    'required',
-                    'string',
-                    'min:7',
-                    'max:20',
-                    'regex:/^[0-9+\-\s()]+$/',
-                ],
+            'phone' => [
+                'bail',
+                'required',
+                'string',
+                'min:7',
+                'max:20',
+                'regex:/^[0-9+\-\s()]+$/',
+            ],
 
-                'region' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:255',
-                ],
+            'region' => [
+                'bail',
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
 
-                'address' => [
-                    'required',
-                    'string',
-                    'min:5',
-                    'max:500',
-                ],
+            'address' => [
+                'bail',
+                'required',
+                'string',
+                'min:5',
+                'max:500',
+            ],
 
-                'landmark' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
-            ]);
+            'landmark' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+        ]);
 
-        $hasAddress =
-            ShippingAddress::query()
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
+        $address = DB::transaction(function () use ($validated) {
+
+            User::query()
+                ->whereKey(Auth::id())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $hasAddress = ShippingAddress::query()
+                ->where('user_id', Auth::id())
                 ->exists();
 
-        $address =
-            ShippingAddress::create([
-                'user_id' =>
-                    Auth::id(),
+            return ShippingAddress::create([
+                'user_id' => Auth::id(),
 
-                'name' =>
-                    trim($validated['name']),
+                'name' => trim($validated['name']),
 
                 'address_type' =>
-                    $validated[
-                        'address_type'
-                    ],
+                    $validated['address_type'],
 
                 'phone' =>
                     trim($validated['phone']),
@@ -283,35 +254,27 @@ class ShippingAddressController extends Controller
                     trim($validated['address']),
 
                 'landmark' =>
-                    isset(
-                        $validated['landmark']
-                    )
-                        ? trim(
-                            $validated['landmark']
-                        )
+                    isset($validated['landmark'])
+                        ? trim($validated['landmark'])
                         : null,
 
                 'is_default_shipping' =>
                     !$hasAddress,
 
-                'is_default_billing' =>
-                    false,
+                'is_default_billing' => false,
             ]);
+        });
 
         return response()->json([
             'success' => true,
-            'message' =>
-                'Address added successfully!',
+            'message' => 'Address added successfully!',
             'address' => $address,
         ]);
     }
 
-    public function edit(
-        ShippingAddress $address
-    ) {
-        $this->authorizeAddress(
-            $address
-        );
+    public function edit(ShippingAddress $address)
+    {
+        $this->authorizeAddress($address);
 
         return view(
             'frontend.shipping-address.edit',
@@ -323,122 +286,150 @@ class ShippingAddressController extends Controller
         Request $request,
         ShippingAddress $address
     ) {
-        $this->authorizeAddress(
-            $address
-        );
+        $this->authorizeAddress($address);
 
-        $validated =
-            $this->validateStrict($request, [
-                'name' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:100',
-                    'regex:/^[\pL\pM\pN .\'-]+$/u',
-                ],
+        $validated = $this->validateStrict($request, [
+            'name' => [
+                'bail',
+                'required',
+                'string',
+                'min:2',
+                'max:100',
+                'regex:/^[\pL\pM\pN .\'-]+$/u',
+            ],
 
-                'phone' => [
-                    'required',
-                    'string',
-                    'min:7',
-                    'max:20',
-                    'regex:/^[0-9+\-\s()]+$/',
-                ],
+            'phone' => [
+                'bail',
+                'required',
+                'string',
+                'min:7',
+                'max:20',
+                'regex:/^[0-9+\-\s()]+$/',
+            ],
 
-                'region' => [
-                    'required',
-                    'string',
-                    'min:2',
-                    'max:255',
-                ],
+            'region' => [
+                'bail',
+                'required',
+                'string',
+                'min:2',
+                'max:255',
+            ],
 
-                'address' => [
-                    'required',
-                    'string',
-                    'min:5',
-                    'max:500',
-                ],
+            'address' => [
+                'bail',
+                'required',
+                'string',
+                'min:5',
+                'max:500',
+            ],
 
-                'landmark' => [
-                    'nullable',
-                    'string',
-                    'max:255',
-                ],
+            'landmark' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
 
-                'address_type' => [
-                    'required',
-                    'string',
-                    Rule::in([
-                        'Home',
-                        'Office',
-                    ]),
-                ],
+            'address_type' => [
+                'required',
+                'string',
+                Rule::in([
+                    'Home',
+                    'Office',
+                ]),
+            ],
 
-                'is_default_shipping' => [
-                    'sometimes',
-                    'boolean',
-                ],
+            'is_default_shipping' => [
+                'sometimes',
+                'boolean',
+            ],
 
-                'is_default_billing' => [
-                    'sometimes',
-                    'boolean',
-                ],
-            ]);
-
-        $address->update([
-            'name' =>
-                trim($validated['name']),
-
-            'phone' =>
-                trim($validated['phone']),
-
-            'region' =>
-                trim($validated['region']),
-
-            'address' =>
-                trim($validated['address']),
-
-            'landmark' =>
-                isset(
-                    $validated['landmark']
-                )
-                    ? trim(
-                        $validated['landmark']
-                    )
-                    : null,
-
-            'address_type' =>
-                $validated[
-                    'address_type'
-                ],
-
-            'is_default_shipping' =>
-                (bool) (
-                    $validated[
-                        'is_default_shipping'
-                    ] ?? false
-                ),
-
-            'is_default_billing' =>
-                (bool) (
-                    $validated[
-                        'is_default_billing'
-                    ] ?? false
-                ),
+            'is_default_billing' => [
+                'sometimes',
+                'boolean',
+            ],
         ]);
 
-        if (
-            $address->is_default_shipping
+        DB::transaction(function () use (
+            $validated,
+            $address
         ) {
-            $this->removeOtherShippingDefaults(
-                $address
+            User::query()
+                ->whereKey(Auth::id())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            /*
+             * Re-read the address inside the transaction after
+             * locking the user's address mutations.
+             */
+            $lockedAddress = ShippingAddress::query()
+                ->where('user_id', Auth::id())
+                ->whereKey($address->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $makeDefault = (bool) (
+                $validated['is_default_shipping'] ?? false
             );
-        }
+
+            if ($makeDefault) {
+                ShippingAddress::query()
+                    ->where('user_id', Auth::id())
+                    ->whereKeyNot($lockedAddress->id)
+                    ->update([
+                        'is_default_shipping' => false,
+                    ]);
+            }
+
+            $lockedAddress->update([
+                'name' =>
+                    trim($validated['name']),
+
+                'phone' =>
+                    trim($validated['phone']),
+
+                'region' =>
+                    trim($validated['region']),
+
+                'address' =>
+                    trim($validated['address']),
+
+                'landmark' =>
+                    isset($validated['landmark'])
+                        ? trim($validated['landmark'])
+                        : null,
+
+                'address_type' =>
+                    $validated['address_type'],
+
+                'is_default_shipping' =>
+                    $makeDefault,
+
+                'is_default_billing' =>
+                    (bool) (
+                        $validated['is_default_billing']
+                        ?? false
+                    ),
+            ]);
+
+            /*
+             * Never leave the user without a default shipping
+             * address if this address was the only default.
+             */
+            if (
+                !ShippingAddress::query()
+                    ->where('user_id', Auth::id())
+                    ->where('is_default_shipping', true)
+                    ->exists()
+            ) {
+                $lockedAddress->update([
+                    'is_default_shipping' => true,
+                ]);
+            }
+        });
 
         return redirect()
-            ->route(
-                'shipping-address.index'
-            )
+            ->route('shipping-address.index')
             ->with(
                 'success',
                 'Shipping address updated successfully!'
@@ -448,57 +439,52 @@ class ShippingAddressController extends Controller
     public function destroy(
         ShippingAddress $address
     ) {
-        $this->authorizeAddress(
-            $address
-        );
+        $this->authorizeAddress($address);
 
-        $count =
-            ShippingAddress::query()
-                ->where(
-                    'user_id',
-                    Auth::id()
-                )
+        DB::transaction(function () use ($address) {
+
+            User::query()
+                ->whereKey(Auth::id())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedAddress = ShippingAddress::query()
+                ->where('user_id', Auth::id())
+                ->whereKey($address->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $count = ShippingAddress::query()
+                ->where('user_id', Auth::id())
                 ->count();
 
-        if ($count <= 1) {
-            return redirect()
-                ->route(
-                    'shipping-address.index'
-                )
-                ->with(
-                    'error',
+            if ($count <= 1) {
+                throw new \RuntimeException(
                     'You cannot delete your only shipping address.'
                 );
-        }
+            }
 
-        $wasDefault =
-            (bool)
-            $address->is_default_shipping;
+            $wasDefault =
+                (bool) $lockedAddress->is_default_shipping;
 
-        $address->delete();
+            $lockedAddress->delete();
 
-        if ($wasDefault) {
-            $newDefault =
-                ShippingAddress::query()
-                    ->where(
-                        'user_id',
-                        Auth::id()
-                    )
+            if ($wasDefault) {
+                $newDefault = ShippingAddress::query()
+                    ->where('user_id', Auth::id())
                     ->latest()
                     ->first();
 
-            if ($newDefault) {
-                $newDefault->update([
-                    'is_default_shipping' =>
-                        true,
-                ]);
+                if ($newDefault) {
+                    $newDefault->update([
+                        'is_default_shipping' => true,
+                    ]);
+                }
             }
-        }
+        });
 
         return redirect()
-            ->route(
-                'shipping-address.index'
-            )
+            ->route('shipping-address.index')
             ->with(
                 'success',
                 'Shipping address deleted successfully!'
@@ -508,29 +494,34 @@ class ShippingAddressController extends Controller
     public function setDefault(
         ShippingAddress $address
     ) {
-        $this->authorizeAddress(
-            $address
-        );
+        $this->authorizeAddress($address);
 
-        ShippingAddress::query()
-            ->where(
-                'user_id',
-                Auth::id()
-            )
-            ->update([
-                'is_default_shipping' =>
-                    false,
+        DB::transaction(function () use ($address) {
+
+            User::query()
+                ->whereKey(Auth::id())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedAddress = ShippingAddress::query()
+                ->where('user_id', Auth::id())
+                ->whereKey($address->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            ShippingAddress::query()
+                ->where('user_id', Auth::id())
+                ->update([
+                    'is_default_shipping' => false,
+                ]);
+
+            $lockedAddress->update([
+                'is_default_shipping' => true,
             ]);
-
-        $address->update([
-            'is_default_shipping' =>
-                true,
-        ]);
+        });
 
         return redirect()
-            ->route(
-                'shipping-address.index'
-            )
+            ->route('shipping-address.index')
             ->with(
                 'success',
                 'Default shipping address updated successfully!'
@@ -545,16 +536,5 @@ class ShippingAddressController extends Controller
             (int) Auth::id(),
             403
         );
-    }
-
-    private function removeOtherShippingDefaults(
-        ShippingAddress $address
-    ): void {
-       ShippingAddress::query()
-    ->where('user_id', Auth::id())
-    ->where('id', '!=', $address->id)
-    ->update([
-        'is_default_shipping' => false,
-    ]);
     }
 }

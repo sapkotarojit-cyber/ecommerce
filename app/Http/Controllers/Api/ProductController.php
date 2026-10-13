@@ -1,0 +1,240 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Product;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class ProductController extends Controller
+{
+    /**
+     * Product listing.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $validated = $this->validateStrict($request, [
+            'page' => [
+                'sometimes',
+                'integer',
+                'min:1',
+                'max:' . config(
+                    'security.validation.pagination.max_page',
+                    1000
+                ),
+            ],
+        ]);
+
+        $page = (int) ($validated['page'] ?? 1);
+
+        $perPage = max(
+            1,
+            (int) config(
+                'security.validation.pagination.products_per_page',
+                12
+            )
+        );
+
+        $products = Product::query()
+            ->with([
+                'category:id,name,slug,is_active',
+                'dokan:id,name,company_name,logo,status',
+                'varients:id,product_id,title,images,price,discount,qty',
+            ])
+            ->latest('products.created_at')
+            ->paginate(
+                $perPage,
+                ['*'],
+                'page',
+                $page
+            );
+
+        return response()->json([
+            'success' =>
+                true,
+
+            'current_page' =>
+                $products->currentPage(),
+
+            'data' =>
+                $products->getCollection()
+                    ->map(
+                        function (Product $product): array {
+                            return $this->productData($product);
+                        }
+                    )
+                    ->values(),
+
+            'first_page_url' =>
+                $products->url(1),
+
+            'from' =>
+                $products->firstItem(),
+
+            'last_page' =>
+                $products->lastPage(),
+
+            'last_page_url' =>
+                $products->url(
+                    $products->lastPage()
+                ),
+
+            'next_page_url' =>
+                $products->nextPageUrl(),
+
+            'path' =>
+                $products->path(),
+
+            'per_page' =>
+                $products->perPage(),
+
+            'prev_page_url' =>
+                $products->previousPageUrl(),
+
+            'to' =>
+                $products->lastItem(),
+
+            'total' =>
+                $products->total(),
+        ]);
+    }
+
+    /**
+     * Display a single product.
+     */
+    public function show(int $id): JsonResponse
+    {
+        if ($id < 1) {
+            return response()->json([
+                'success' =>
+                    false,
+
+                'message' =>
+                    'Invalid product ID.',
+            ], 422);
+        }
+
+        $product = Product::query()
+            ->with([
+                'category:id,name,slug,is_active',
+                'dokan:id,name,company_name,logo,status',
+                'varients:id,product_id,title,images,price,discount,qty',
+            ])
+            ->find($id);
+
+        if (! $product) {
+            return response()->json([
+                'success' =>
+                    false,
+
+                'message' =>
+                    'Product not found.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' =>
+                true,
+
+            'data' =>
+                $this->productData($product),
+        ]);
+    }
+
+    /**
+     * Public-safe product representation.
+     */
+    private function productData(
+        Product $product
+    ): array {
+        $vendor = $product->dokan;
+
+        return [
+            'id' =>
+                $product->id,
+
+            'category_id' =>
+                $product->category_id,
+
+            'title' =>
+                $product->title,
+
+            'description' =>
+                $product->description,
+
+            'dokan_id' =>
+                $product->dokan_id,
+
+            'category' =>
+                $product->category
+                    ? [
+                        'id' =>
+                            $product->category->id,
+
+                        'name' =>
+                            $product->category->name,
+
+                        'slug' =>
+                            $product->category->slug,
+
+                        'is_active' =>
+                            (bool) $product->category->is_active,
+                    ]
+                    : null,
+
+            'dokan' =>
+                $vendor
+                    ? [
+                        'id' =>
+                            $vendor->id,
+
+                        'name' =>
+                            $vendor->name,
+
+                        'company_name' =>
+                            $vendor->company_name,
+
+                        'logo' =>
+                            $vendor->logo,
+
+                        'status' =>
+                            $vendor->status,
+                    ]
+                    : null,
+
+            'varients' =>
+                $product->varients
+                    ->map(
+                        function ($variant): array {
+                            return [
+                                'id' =>
+                                    $variant->id,
+
+                                'product_id' =>
+                                    $variant->product_id,
+
+                                'title' =>
+                                    $variant->title,
+
+                                'images' =>
+                                    is_array($variant->images)
+                                        ? $variant->images
+                                        : [],
+
+                                'price' =>
+                                    (float) $variant->price,
+
+                                'discount' =>
+                                    (float) $variant->discount,
+
+                                'qty' =>
+                                    (int) $variant->qty,
+                            ];
+                        }
+                    )
+                    ->values()
+                    ->all(),
+        ];
+    }
+}

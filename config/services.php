@@ -38,7 +38,15 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+        'api_redirect' => env('GOOGLE_API_REDIRECT_URI'),
+
+
+            // Flutter Linux Desktop OAuth
+        'desktop_client_id' => env('GOOGLE_DESKTOP_CLIENT_ID'),
+        'desktop_client_secret' => env('GOOGLE_DESKTOP_CLIENT_SECRET'),
     ],
+
+    
 
    'esewa' => [
         'merchant_code' => env('ESEWA_PRODUCT_CODE'), 
@@ -53,9 +61,13 @@ return [
     ),
 ],
     'bank' => [
-            'url' => env('BANK_URL', '#'),
-        ],
+    'url' => env('BANK_URL', '#'),
+    'name' => env('BANK_NAME'),
+    'account_name' => env('BANK_ACCOUNT_NAME'),
+    'account_number' => env('BANK_ACCOUNT_NUMBER'),
+    'branch' => env('BANK_BRANCH'),
+    'qr_image_url' => env('BANK_QR_IMAGE_URL'),
+],
 
 ];
-
 

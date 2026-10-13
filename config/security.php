@@ -204,4 +204,33 @@ return [
         ],
     ],
 
+     /*
+    |--------------------------------------------------------------------------
+    | API Input Limits
+    |--------------------------------------------------------------------------
+    */
+
+    'validation' => [
+
+            'pagination' => [
+                'products_per_page' => (int) env(
+                    'SECURITY_PRODUCTS_PER_PAGE',
+                    12
+                ),            
+            'max_page' => (int) env(
+                'SECURITY_MAX_PAGE',
+                1000
+            ),    
+            ],
+
+        'cart' => [
+            'quantity_min' => 1,
+            'quantity_max' => 9999,
+        ],
+
+        'strings' => [
+            'search_max' => 100,
+        ],
+    ],
+
 ];

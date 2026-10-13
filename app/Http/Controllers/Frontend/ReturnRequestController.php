@@ -8,13 +8,14 @@ use App\Models\ReturnRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
 
 class ReturnRequestController extends Controller
 {
     /**
      * Display customer's return request form.
      */
-    public function create($id)
+    public function create(int $id)
     {
         $order = Order::with([
             'order_items.product',
@@ -23,37 +24,25 @@ class ReturnRequestController extends Controller
             'dokan',
             'returnRequests',
         ])
-            ->where(
-                'user_id',
-                Auth::id()
-            )
+            ->where('user_id', Auth::id())
             ->findOrFail($id);
 
         if ($order->returnRequests()->exists()) {
             return redirect()
-                ->route(
-                    'orders.show',
-                    $order->id
-                )
+                ->route('orders.show', $order->id)
                 ->with(
                     'error',
                     'A return request already exists for this order.'
                 );
         }
 
-        if (! in_array(
+        if (!in_array(
             $order->order_status,
-            [
-                'cancelled',
-                'completed',
-            ],
+            ['cancelled', 'completed'],
             true
         )) {
             return redirect()
-                ->route(
-                    'orders.show',
-                    $order->id
-                )
+                ->route('orders.show', $order->id)
                 ->with(
                     'error',
                     'This order cannot be returned.'
@@ -67,14 +56,15 @@ class ReturnRequestController extends Controller
     }
 
     /**
-     * Store customer return request.
+     * Store customer's return request.
      */
     public function store(
         Request $request,
-        $id
+        int $id
     ) {
         $validated = $this->validateStrict($request, [
             'reason' => [
+                'bail',
                 'required',
                 'string',
                 'min:10',
@@ -83,48 +73,49 @@ class ReturnRequestController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use (
-                $id,
-                $validated,
-                &$returnRequest
-            ) {
-                $order = Order::where(
-                    'user_id',
-                    Auth::id()
-                )
-                    ->lockForUpdate()
-                    ->findOrFail($id);
+            $returnRequest = DB::transaction(
+                function () use ($id, $validated) {
 
-                if (! in_array(
-                    $order->order_status,
-                    [
-                        'cancelled',
-                        'completed',
-                    ],
-                    true
-                )) {
-                    throw new \RuntimeException(
-                        'This order cannot be returned.'
-                    );
+                    /*
+                     * Lock the order row so two simultaneous requests
+                     * cannot both pass the return eligibility check.
+                     */
+                    $order = Order::query()
+                        ->where('user_id', Auth::id())
+                        ->lockForUpdate()
+                        ->findOrFail($id);
+
+                    if (!in_array(
+                        $order->order_status,
+                        ['cancelled', 'completed'],
+                        true
+                    )) {
+                        throw new \RuntimeException(
+                            'This order cannot be returned.'
+                        );
+                    }
+
+                    /*
+                     * Check again inside the transaction.
+                     */
+                    if ($order->returnRequests()->exists()) {
+                        throw new \RuntimeException(
+                            'A return request already exists for this order.'
+                        );
+                    }
+
+                    return ReturnRequest::create([
+                        'order_id' => $order->id,
+                        'user_id' => Auth::id(),
+                        'dokan_id' => $order->dokan_id,
+                        'reason' => trim($validated['reason']),
+                        'status' => 'requested',
+                        'refund_status' => 'pending',
+                        'refund_amount' => $order->total_amount,
+                        'admin_note' => null,
+                    ]);
                 }
-
-                if ($order->returnRequests()->exists()) {
-                    throw new \RuntimeException(
-                        'A return request already exists for this order.'
-                    );
-                }
-
-                $returnRequest = ReturnRequest::create([
-                    'order_id' => $order->id,
-                    'user_id' => Auth::id(),
-                    'dokan_id' => $order->dokan_id,
-                    'reason' => trim($validated['reason']),
-                    'status' => 'requested',
-                    'refund_status' => 'pending',
-                    'refund_amount' => $order->total_amount,
-                    'admin_note' => null,
-                ]);
-            });
+            );
 
             return redirect()
                 ->route(
@@ -137,13 +128,18 @@ class ReturnRequestController extends Controller
                 );
         } catch (\RuntimeException $e) {
             return redirect()
-                ->route(
-                    'orders.show',
-                    $id
-                )
+                ->route('orders.show', $id)
+                ->with('error', $e->getMessage());
+        } catch (QueryException $e) {
+            /*
+             * A database unique constraint can also reject a
+             * concurrent duplicate return request.
+             */
+            return redirect()
+                ->route('orders.show', $id)
                 ->with(
                     'error',
-                    $e->getMessage()
+                    'A return request already exists for this order.'
                 );
         }
     }
@@ -157,10 +153,7 @@ class ReturnRequestController extends Controller
             'order',
             'dokan',
         ])
-            ->where(
-                'user_id',
-                Auth::id()
-            )
+            ->where('user_id', Auth::id())
             ->latest()
             ->paginate(10);
 
@@ -173,17 +166,14 @@ class ReturnRequestController extends Controller
     /**
      * Display one return request.
      */
-    public function show($id)
+    public function show(int $id)
     {
         $returnRequest = ReturnRequest::with([
             'order.order_items.product',
             'order.order_items.varient',
             'dokan',
         ])
-            ->where(
-                'user_id',
-                Auth::id()
-            )
+            ->where('user_id', Auth::id())
             ->findOrFail($id);
 
         return view(

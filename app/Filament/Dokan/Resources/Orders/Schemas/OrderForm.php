@@ -64,16 +64,12 @@ class OrderForm
             Select::make('payment_status')
                 ->label('Payment Status')
                 ->options([
-                    'pending' => 'Pending',
+                    'pending' => 'Pending Verification',
                     'paid' => 'Paid',
                     'failed' => 'Failed',
                 ])
                 ->required(),
-
-            TextInput::make('payment_method')
-                ->label('Payment Method')
-                ->disabled()
-                ->dehydrated(false),
+                
 
             FileUpload::make('payment_receipt')
                 ->label('Payment Receipt')

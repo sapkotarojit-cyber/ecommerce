@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Orders\Tables;
 
+use App\Mail\PaymentSuccessfulMail;
 use App\Models\Order;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -10,6 +11,9 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class OrdersTable
 {
@@ -17,12 +21,10 @@ class OrdersTable
     {
         return $table
             ->columns([
-
                 // Product Image
                 ImageColumn::make('product_image')
                     ->label('Image')
                     ->state(function (Order $record) {
-
                         $orderItem = $record->orderItems->first();
 
                         if (! $orderItem) {
@@ -95,13 +97,13 @@ class OrdersTable
                 TextColumn::make('payment_receipt')
                     ->label('Receipt')
                     ->formatStateUsing(
-                        fn ($state) => $state
+                        fn ($state) => filled($state)
                             ? 'Uploaded'
                             : 'Not Uploaded'
                     )
                     ->badge()
                     ->color(
-                        fn ($state) => $state
+                        fn ($state) => filled($state)
                             ? 'success'
                             : 'gray'
                     ),
@@ -132,13 +134,10 @@ class OrdersTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-
             ->filters([
                 //
             ])
-
             ->recordActions([
-
                 /*
                  * VIEW PAYMENT RECEIPT
                  */
@@ -155,7 +154,10 @@ class OrdersTable
                     ->openUrlInNewTab(),
 
                 /*
-                 * APPROVE PAYMENT
+                 * APPROVE BANK PAYMENT
+                 *
+                 * The email is sent after the entire payment group
+                 * has become paid and the database transaction commits.
                  */
                 Action::make('approvePayment')
                     ->label('Approve Payment')
@@ -164,18 +166,101 @@ class OrdersTable
                     ->requiresConfirmation()
                     ->modalHeading('Approve Payment')
                     ->modalDescription(
-                        'Are you sure you want to approve this payment? The order will be marked as paid and confirmed.'
+                        'Approve this bank transfer? The order will be marked as paid and confirmed.'
                     )
                     ->visible(fn (Order $record) =>
-                        $record->payment_status === 'pending'
+                        $record->payment_method === 'bank'
+                        && $record->payment_status === 'pending'
                         && filled($record->payment_receipt)
                     )
-                    ->action(function (Order $record) {
+                    ->action(function (Order $record): void {
+                        $result = DB::transaction(
+                            function () use ($record): array {
+                                $orders = Order::query()
+                                    ->where('user_id', $record->user_id)
+                                    ->where(
+                                        'payment_group_id',
+                                        $record->payment_group_id
+                                    )
+                                    ->orderBy('id')
+                                    ->lockForUpdate()
+                                    ->get();
 
-                        $record->update([
-                            'payment_status' => 'paid',
-                            'order_status' => 'confirmed',
-                        ]);
+                                if ($orders->isEmpty()) {
+                                    throw new \RuntimeException(
+                                        'Payment group not found.'
+                                    );
+                                }
+
+                                $target = $orders->firstWhere(
+                                    'id',
+                                    $record->id
+                                );
+
+                                if (! $target) {
+                                    throw new \RuntimeException(
+                                        'Order not found in its payment group.'
+                                    );
+                                }
+
+                                if ($target->payment_method !== 'bank') {
+                                    throw new \RuntimeException(
+                                        'This is not a bank-transfer order.'
+                                    );
+                                }
+
+                                if ($target->payment_status === 'paid') {
+                                    return [
+                                        'newly_approved' => false,
+                                        'group_fully_paid' => $orders->every(
+                                            fn (Order $order) =>
+                                                $order->payment_status === 'paid'
+                                        ),
+                                    ];
+                                }
+
+                                if (
+                                    $target->payment_status !== 'pending'
+                                    || ! filled($target->payment_receipt)
+                                ) {
+                                    throw new \RuntimeException(
+                                        'This order is not eligible for approval.'
+                                    );
+                                }
+
+                                $groupWasFullyPaid = $orders->every(
+                                    fn (Order $order) =>
+                                        $order->payment_status === 'paid'
+                                );
+
+                                $target->payment_status = 'paid';
+                                $target->order_status = 'confirmed';
+                                $target->save();
+
+                                $orders = Order::query()
+                                    ->where('user_id', $target->user_id)
+                                    ->where(
+                                        'payment_group_id',
+                                        $target->payment_group_id
+                                    )
+                                    ->orderBy('id')
+                                    ->get();
+
+                                return [
+                                    'newly_approved' => true,
+                                    'group_fully_paid' => $orders->isNotEmpty()
+                                        && $orders->every(
+                                            fn (Order $order) =>
+                                                $order->payment_status === 'paid'
+                                        ),
+                                    'group_was_fully_paid' => $groupWasFullyPaid,
+                                    'user_id' => $target->user_id,
+                                    'payment_group_id' =>
+                                        $target->payment_group_id,
+                                ];
+                            }
+                        );
+
                     })
                     ->successNotificationTitle(
                         'Payment approved successfully'
@@ -196,22 +281,16 @@ class OrdersTable
                     ->visible(fn (Order $record) =>
                         $record->payment_status === 'pending'
                     )
-                    ->action(function (Order $record) {
-
+                    ->action(function (Order $record): void {
                         $record->update([
                             'payment_status' => 'failed',
                         ]);
                     })
-                    ->successNotificationTitle(
-                        'Payment rejected'
-                    ),
+                    ->successNotificationTitle('Payment rejected'),
 
-                /*
-                 * NORMAL EDIT
-                 */
+                // NORMAL EDIT
                 EditAction::make(),
             ])
-
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
