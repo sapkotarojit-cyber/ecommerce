@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\PaymentSuccessfulMail;
 use App\Models\Order;
+use App\Services\OrderInventoryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -400,6 +401,19 @@ class PaymentController extends Controller
                             'PAYMENT_GROUP_TRANSACTION_MISMATCH'
                         );
                     }
+                }
+
+                $inventory = app(OrderInventoryService::class);
+
+                // Keep the entire group atomic: a failure on any order
+                // rolls back every deduction and status change.
+                foreach ($lockedOrders as $order) {
+                    $inventory->deductForPayment($order);
+                }
+
+                // Remove purchased quantities only after payment is verified.
+                foreach ($lockedOrders as $order) {
+                    $inventory->removePurchasedCartItems($order);
                 }
 
                 foreach ($lockedOrders as $order) {

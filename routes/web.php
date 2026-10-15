@@ -26,7 +26,7 @@ Route::get('/dokan-registration', [PageController::class, 'dokan_registration'])
     ->name('dokan_registration');
 
 Route::post('/dokan-registration', [PageController::class, 'dokan_registration_submit'])
-    ->middleware('adaptive.rate:sensitive')
+    ->middleware(['auth', 'adaptive.rate:sensitive'])
     ->name('dokan_registration_submit');
 
 Route::view('/terms-and-conditions', 'frontend.pages.terms')->name('terms');
@@ -180,6 +180,10 @@ Route::middleware('auth')->group(function () {
             ->name('buy-now');
 
         Route::post('/clear', [CartController::class, 'clear'])
+            ->middleware('adaptive.rate:sensitive')
+            ->name('clear.post');
+
+        Route::delete('/clear', [CartController::class, 'clear'])
             ->middleware('adaptive.rate:sensitive')
             ->name('clear');
 

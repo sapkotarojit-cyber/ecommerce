@@ -456,7 +456,7 @@ class CartController extends Controller
     /**
      * Remove item from cart.
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id)
     {
         $deleted = false;
 
@@ -480,47 +480,55 @@ class CartController extends Controller
         });
 
         if (! $deleted) {
-            return response()->json([
-                'success' => false,
-                'message' =>
-                    'Cart item not found or it does not belong to your account.',
-            ], 404);
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cart item not found or it does not belong to your account.',
+                ], 404);
+            }
+
+            return redirect()->route('cart.index')
+                ->with('error', 'Cart item not found or it does not belong to your account.');
         }
 
         $cartItems = $this->getCartItems();
 
         $total = $this->calculateCartTotal($cartItems);
 
-        return response()->json(
-            array_merge(
-                $this->cartResponsePayload(
-                    $cartItems,
-                    $total
-                ),
-                [
-                    'message' =>
-                        'Item removed from cart.',
-                ]
-            )
-        );
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(
+                array_merge(
+                    $this->cartResponsePayload($cartItems, $total),
+                    ['message' => 'Item removed from cart.']
+                )
+            );
+        }
+
+        return redirect()->route('cart.index')
+            ->with('success', 'Item removed from cart.');
     }
 
     /**
      * Clear the authenticated user's entire cart.
      */
-    public function clear(): JsonResponse
+    public function clear(Request $request)
     {
         Cart::query()
             ->where('user_id', Auth::id())
             ->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Cart cleared successfully.',
-            'cart_count' => 0,
-            'total' => 0,
-            'items' => [],
-        ]);
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Cart cleared successfully.',
+                'cart_count' => 0,
+                'total' => 0,
+                'items' => [],
+            ]);
+        }
+
+        return redirect()->route('cart.index')
+            ->with('success', 'Cart cleared successfully.');
     }
 
     /**

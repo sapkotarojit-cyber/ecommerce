@@ -56,20 +56,26 @@ class OrderService
             |--------------------------------------------------------------------------
             */
 
-            foreach ($order->order_items as $item) {
-                $variant = ProductVarient::query()
-                    ->whereKey(
-                        $item->varient_id
-                    )
-                    ->lockForUpdate()
-                    ->first();
+            // Restore inventory only when this order actually
+            // deducted it, and never restore it twice.
+            if (
+                $order->stock_deducted_at !== null
+                && $order->stock_restored_at === null
+            ) {
+                foreach ($order->order_items as $item) {
+                    $variant = ProductVarient::query()
+                        ->whereKey($item->varient_id)
+                        ->lockForUpdate()
+                        ->first();
 
-                if ($variant) {
-                    $variant->increment(
-                        'qty',
-                        (int) $item->qty
-                    );
+                    if ($variant) {
+                        $variant->increment('qty', (int) $item->qty);
+                    }
                 }
+
+                $order->forceFill([
+                    'stock_restored_at' => now(),
+                ])->save();
             }
 
             /*

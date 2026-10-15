@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Tables;
 
 use App\Mail\PaymentSuccessfulMail;
 use App\Models\Order;
+use App\Services\OrderInventoryService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -232,6 +233,13 @@ class OrdersTable
                                     fn (Order $order) =>
                                         $order->payment_status === 'paid'
                                 );
+
+                                // Approve and deduct only this vendor order.
+                                // Other orders in the payment group may
+                                // still be awaiting their own approval.
+                                $inventory = app(OrderInventoryService::class);
+                                $inventory->deductForPayment($target);
+                                $inventory->removePurchasedCartItems($target);
 
                                 $target->payment_status = 'paid';
                                 $target->order_status = 'confirmed';

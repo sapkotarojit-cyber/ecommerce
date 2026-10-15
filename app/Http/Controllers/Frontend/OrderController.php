@@ -7,6 +7,7 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\ProductVarient;
 use App\Models\ReturnRequest;
+use App\Services\OrderInventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -197,23 +198,26 @@ class OrderController extends Controller
                                 : 'failed',
                     ]);
 
-                    foreach (
-                        $order->order_items
-                        as $item
+                    // Restore inventory only when this order actually
+                    // deducted it, and never restore it twice.
+                    if (
+                        $order->stock_deducted_at !== null
+                        && $order->stock_restored_at === null
                     ) {
-                        $variant = ProductVarient::query()
-                            ->whereKey(
-                                $item->varient_id
-                            )
-                            ->lockForUpdate()
-                            ->first();
+                        foreach ($order->order_items as $item) {
+                            $variant = ProductVarient::query()
+                                ->whereKey($item->varient_id)
+                                ->lockForUpdate()
+                                ->first();
 
-                        if ($variant) {
-                            $variant->increment(
-                                'qty',
-                                (int) $item->qty
-                            );
+                            if ($variant) {
+                                $variant->increment('qty', (int) $item->qty);
+                            }
                         }
+
+                        $order->forceFill([
+                            'stock_restored_at' => now(),
+                        ])->save();
                     }
 
                     if (
@@ -869,6 +873,8 @@ class OrderController extends Controller
                 $orders,
                 $uuid
             ) {
+                $inventory = app(OrderInventoryService::class);
+
                 $lockedOrders =
                     Order::query()
                         ->whereIn(
@@ -882,24 +888,17 @@ class OrderController extends Controller
                         ->lockForUpdate()
                         ->get();
 
-                foreach (
-                    $lockedOrders
-                    as $lockedOrder
-                ) {
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Re-check UUID while holding the lock.
-                    |--------------------------------------------------------------------------
-                    */
+                if ($lockedOrders->isEmpty()) {
+                    throw new \RuntimeException(
+                        'No pending orders remain in this payment group.'
+                    );
+                }
 
+                foreach ($lockedOrders as $lockedOrder) {
                     if (
-                        $lockedOrder
-                            ->payment_transaction_id ===
-                            null ||
+                        $lockedOrder->payment_transaction_id === null ||
                         ! hash_equals(
-                            (string)
-                                $lockedOrder
-                                    ->payment_transaction_id,
+                            (string) $lockedOrder->payment_transaction_id,
                             $uuid
                         )
                     ) {
@@ -908,6 +907,25 @@ class OrderController extends Controller
                         );
                     }
 
+                    if ($lockedOrder->payment_method !== 'esewa') {
+                        throw new \RuntimeException(
+                            'Payment group method mismatch.'
+                        );
+                    }
+                }
+
+                // All deductions and payment updates roll back together
+                // if any variant has insufficient stock.
+                foreach ($lockedOrders as $lockedOrder) {
+                    $inventory->deductForPayment($lockedOrder);
+                }
+
+                // Payment is confirmed: remove only purchased quantities from cart.
+                foreach ($lockedOrders as $lockedOrder) {
+                    $inventory->removePurchasedCartItems($lockedOrder);
+                }
+
+                foreach ($lockedOrders as $lockedOrder) {
                     $lockedOrder->update([
                         'payment_status' =>
                             'paid',
@@ -1349,9 +1367,7 @@ class OrderController extends Controller
                             $tracking
                         )
                     ) {
-                        $q->orWhereKey(
-                            (int) $tracking
-                        );
+                        $q->orWhere('id', (int) $tracking);
                     }
                 }
             )
@@ -1836,71 +1852,59 @@ class OrderController extends Controller
                         continue;
                     }
 
-                    if (
-                        empty(
-                            $locked->stock_restored_at
-                        )
-                    ) {
-                        foreach (
-                            $locked->order_items
-                            as $item
-                        ) {
-                            $variant =
-                                ProductVarient::query()
-                                    ->whereKey(
-                                        $item->varient_id
-                                    )
-                                    ->lockForUpdate()
-                                    ->first();
+                    if (empty($locked->cart_restored_at)) {
+                        // Aggregate duplicate order lines for the same variant.
+                        // Online checkout leaves cart rows in place, so restore by
+                        // REPLACING the matching quantity, never incrementing it.
+                        $quantities = $locked->order_items
+                            ->groupBy('varient_id')
+                            ->map(fn ($rows) => (int) $rows->sum('qty'));
 
-                            if ($variant) {
-                                $variant->increment(
-                                    'qty',
-                                    (int) $item->qty
-                                );
+                        foreach ($quantities as $variantId => $quantity) {
+                            if ($quantity < 1) {
+                                continue;
+                            }
 
-                                $existing =
-                                    Cart::query()
-                                        ->where(
-                                            'user_id',
-                                            $locked->user_id
-                                        )
-                                        ->where(
-                                            'varient_id',
-                                            $item->varient_id
-                                        )
-                                        ->first();
+                            $variant = ProductVarient::query()
+                                ->whereKey($variantId)
+                                ->lockForUpdate()
+                                ->first();
 
-                                if ($existing) {
-                                    $existing->increment(
-                                        'qty',
-                                        (int) $item->qty
-                                    );
-                                } else {
-                                    Cart::create([
-                                        'user_id' =>
-                                            $locked->user_id,
+                            // A deleted variant cannot be re-added to the cart.
+                            if (! $variant) {
+                                continue;
+                            }
 
-                                        'product_id' =>
-                                            $item->product_id,
+                            $existing = Cart::query()
+                                ->where('user_id', $locked->user_id)
+                                ->where('varient_id', $variantId)
+                                ->orderBy('id')
+                                ->lockForUpdate()
+                                ->first();
 
-                                        'varient_id' =>
-                                            $item->varient_id,
-
-                                        'dokan_id' =>
-                                            $locked->dokan_id,
-
-                                        'qty' =>
-                                            $item->qty,
-                                    ]);
-                                }
+                            if ($existing) {
+                                // Replace instead of incrementing; the cart row
+                                // usually already exists from online checkout.
+                                $existing->update([
+                                    'product_id' => $variant->product_id,
+                                    'dokan_id' => $locked->dokan_id,
+                                    'qty' => $quantity,
+                                ]);
+                            } else {
+                                Cart::create([
+                                    'user_id' => $locked->user_id,
+                                    'product_id' => $variant->product_id,
+                                    'varient_id' => $variant->id,
+                                    'dokan_id' => $locked->dokan_id,
+                                    'qty' => $quantity,
+                                ]);
                             }
                         }
 
-                        $locked->update([
-                            'stock_restored_at' =>
-                                now(),
-                        ]);
+                        // This timestamp guards against duplicate restoration.
+                        $locked->forceFill([
+                            'cart_restored_at' => now(),
+                        ])->save();
                     }
 
                     $locked->update([

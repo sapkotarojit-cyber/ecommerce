@@ -275,6 +275,19 @@ class PageController extends Controller
      */
     public function dokan_registration_submit(Request $request)
     {
+            $user = $request->user();
+
+    if (!$user) {
+        return redirect()
+            ->route('login')
+            ->with('error', 'Please log in before submitting a vendor application.');
+    }
+
+    if (!$user->email_verified_at) {
+        return redirect()
+            ->route('login')
+            ->with('error', 'Please verify your email before submitting a vendor application.');
+    }
         /*
         |--------------------------------------------------------------------------
         | Strict vendor registration validation
@@ -436,6 +449,14 @@ class PageController extends Controller
             |--------------------------------------------------------------------------
             */
             $email = strtolower(trim($data['email']));
+
+            if ($email !== strtolower(trim($user->email))) {
+    return back()
+        ->withInput()
+        ->withErrors([
+            'email' => 'Your vendor email must match your verified account email.',
+        ]);
+}
 
             /*
             |--------------------------------------------------------------------------

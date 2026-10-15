@@ -354,6 +354,12 @@ class CheckoutController extends Controller
                         }
                     }
 
+                    if ($validated['payment_method'] === 'cod') {
+                        $order->forceFill([
+                            'stock_deducted_at' => now(),
+                        ])->save();
+                    }
+
                     $createdOrders[] = $order;
                 }
 

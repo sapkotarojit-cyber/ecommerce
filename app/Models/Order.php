@@ -19,10 +19,16 @@ class Order extends Model
         'payment_receipt',
         'payment_transaction_id',
         'payment_group_id',
+        'stock_deducted_at',
+        'stock_restored_at',
+        'cart_restored_at',
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'stock_deducted_at' => 'datetime',
+        'stock_restored_at' => 'datetime',
+        'cart_restored_at' => 'datetime',
     ];
 
     protected static function boot()
