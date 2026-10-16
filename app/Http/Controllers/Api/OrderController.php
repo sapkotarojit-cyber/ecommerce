@@ -113,7 +113,8 @@ class OrderController extends Controller
                         );
 
                         if (ctype_digit($search)) {
-                            $q->orWhereKey(
+                            $q->orWhere(
+                                'id',
                                 (int) $search
                             );
                         }

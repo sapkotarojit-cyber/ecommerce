@@ -484,6 +484,12 @@ class CheckoutController extends Controller
                 ->with('error', 'No orders were created. Please try again.');
         }
 
+        // The transaction succeeded; query-builder stock deductions
+        // require explicit catalog-cache invalidation.
+        if ($validated['payment_method'] === 'cod') {
+            app(\App\Services\CatalogCache::class)->invalidateAfterCommit();
+        }
+
         $order = $orders[0];
 
         /*

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Order;
 use App\Models\ProductVarient;
+use App\Services\CatalogCache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -74,6 +75,8 @@ class OrderInventoryService
         foreach ($variants as [$variant, $quantity]) {
             $variant->decrement('qty', $quantity);
         }
+
+        app(CatalogCache::class)->invalidateAfterCommit();
 
         $order->forceFill([
             'stock_deducted_at' => now(),

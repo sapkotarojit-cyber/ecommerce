@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Services\CatalogCache;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -36,68 +37,47 @@ class ProductController extends Controller
             )
         );
 
-        $products = Product::query()
-            ->with([
-                'category:id,name,slug,is_active',
-                'dokan:id,name,company_name,logo,status',
-                'varients:id,product_id,title,images,price,discount,qty',
-            ])
-            ->latest('products.created_at')
-            ->paginate(
-                $perPage,
-                ['*'],
-                'page',
-                $page
-            );
+        $key = 'products:list:' . hash('sha256', $request->fullUrl());
 
-        return response()->json([
-            'success' =>
-                true,
+        $payload = app(CatalogCache::class)->remember(
+            $key,
+            function () use ($page, $perPage): array {
+                $products = Product::query()
+                    ->with([
+                        'category:id,name,slug,is_active',
+                        'dokan:id,name,company_name,logo,status',
+                        'varients:id,product_id,title,images,price,discount,qty',
+                    ])
+                    ->latest('products.created_at')
+                    ->paginate(
+                        $perPage,
+                        ['*'],
+                        'page',
+                        $page
+                    );
 
-            'current_page' =>
-                $products->currentPage(),
+                return [
+                    'success' => true,
+                    'current_page' => $products->currentPage(),
+                    'data' => $products->getCollection()
+                        ->map(fn (Product $product): array => $this->productData($product))
+                        ->values()
+                        ->all(),
+                    'first_page_url' => $products->url(1),
+                    'from' => $products->firstItem(),
+                    'last_page' => $products->lastPage(),
+                    'last_page_url' => $products->url($products->lastPage()),
+                    'next_page_url' => $products->nextPageUrl(),
+                    'path' => $products->path(),
+                    'per_page' => $products->perPage(),
+                    'prev_page_url' => $products->previousPageUrl(),
+                    'to' => $products->lastItem(),
+                    'total' => $products->total(),
+                ];
+            }
+        );
 
-            'data' =>
-                $products->getCollection()
-                    ->map(
-                        function (Product $product): array {
-                            return $this->productData($product);
-                        }
-                    )
-                    ->values(),
-
-            'first_page_url' =>
-                $products->url(1),
-
-            'from' =>
-                $products->firstItem(),
-
-            'last_page' =>
-                $products->lastPage(),
-
-            'last_page_url' =>
-                $products->url(
-                    $products->lastPage()
-                ),
-
-            'next_page_url' =>
-                $products->nextPageUrl(),
-
-            'path' =>
-                $products->path(),
-
-            'per_page' =>
-                $products->perPage(),
-
-            'prev_page_url' =>
-                $products->previousPageUrl(),
-
-            'to' =>
-                $products->lastItem(),
-
-            'total' =>
-                $products->total(),
-        ]);
+        return response()->json($payload);
     }
 
     /**
@@ -107,39 +87,41 @@ class ProductController extends Controller
     {
         if ($id < 1) {
             return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    'Invalid product ID.',
+                'success' => false,
+                'message' => 'Invalid product ID.',
             ], 422);
         }
 
-        $product = Product::query()
-            ->with([
-                'category:id,name,slug,is_active',
-                'dokan:id,name,company_name,logo,status',
-                'varients:id,product_id,title,images,price,discount,qty',
-            ])
-            ->find($id);
+        $payload = app(CatalogCache::class)->remember(
+            'products:detail:' . $id,
+            function () use ($id): ?array {
+                $product = Product::query()
+                    ->with([
+                        'category:id,name,slug,is_active',
+                        'dokan:id,name,company_name,logo,status',
+                        'varients:id,product_id,title,images,price,discount,qty',
+                    ])
+                    ->find($id);
 
-        if (! $product) {
+                if (! $product) {
+                    return null;
+                }
+
+                return [
+                    'success' => true,
+                    'data' => $this->productData($product),
+                ];
+            }
+        );
+
+        if ($payload === null) {
             return response()->json([
-                'success' =>
-                    false,
-
-                'message' =>
-                    'Product not found.',
+                'success' => false,
+                'message' => 'Product not found.',
             ], 404);
         }
 
-        return response()->json([
-            'success' =>
-                true,
-
-            'data' =>
-                $this->productData($product),
-        ]);
+        return response()->json($payload);
     }
 
     /**

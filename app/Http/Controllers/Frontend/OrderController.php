@@ -260,6 +260,9 @@ class OrderController extends Controller
                 }
             );
 
+            // The cancellation transaction committed successfully.
+            app(\App\Services\CatalogCache::class)->invalidate();
+
             return redirect()
                 ->route(
                     'orders.show',

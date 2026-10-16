@@ -388,6 +388,12 @@ class CheckoutController extends Controller
             ], 500);
         }
 
+        // The checkout transaction has committed. Query-builder stock
+        // deductions bypass Eloquent observers, so invalidate explicitly.
+        if ($validated['payment_method'] === 'cod') {
+            app(\App\Services\CatalogCache::class)->invalidateAfterCommit();
+        }
+
         /*
          * Only COD has been finalized at this point.
          * Email errors must not undo a committed order.
