@@ -120,7 +120,7 @@ class ProductForm
                     TextInput::make('price')
                         ->label('Price')
                         ->numeric()
-                        ->minValue(0)
+                        ->minValue(1)
                         ->prefix('Rs.')
                         ->required(),
 

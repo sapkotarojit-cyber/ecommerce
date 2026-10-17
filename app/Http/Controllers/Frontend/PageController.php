@@ -51,6 +51,13 @@ class PageController extends Controller
         |--------------------------------------------------------------------------
         */
         $validated = $this->validateStrict($request, [
+
+                'search' => [
+                    'nullable',
+                    'string',
+                    'max:100',
+                ],
+
             'category' => [
                 'nullable',
                 'string',
@@ -84,6 +91,35 @@ class PageController extends Controller
             'dokan',
             'varients',
         ]);
+
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Product search
+|--------------------------------------------------------------------------
+*/
+$search = trim($validated['search'] ?? '');
+
+if ($search !== '') {
+    $escapedSearch = addcslashes($search, '%_\\');
+
+    $query->where(function ($q) use ($escapedSearch) {
+        $q->where(
+            'products.title',
+            'like',
+            '%' . $escapedSearch . '%'
+        )->orWhere(
+            'products.description',
+            'like',
+            '%' . $escapedSearch . '%'
+        );
+    });
+}
+
+
+        
 
         /*
         |--------------------------------------------------------------------------

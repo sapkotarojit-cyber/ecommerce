@@ -35,7 +35,6 @@ class ProductForm
             ->searchable()
             ->preload()
             ->required()
-            ->integer()
             ->rules([
                 'integer',
                 'exists:categories,id',
@@ -169,7 +168,6 @@ class ProductForm
                         ->label('Discount')
                         ->required()
                         ->numeric()
-                        ->integer()
                         ->minValue(0)
                         ->maxValue(100)
                         ->default(0)
@@ -187,7 +185,6 @@ class ProductForm
                         ->label('Stock Quantity')
                         ->required()
                         ->numeric()
-                        ->integer()
                         ->minValue(0)
                         ->maxValue(2147483647)
                         ->default(1)
@@ -200,35 +197,22 @@ class ProductForm
                     /*
                      * PRODUCT IMAGES
                      */
-                    FileUpload::make('images')
+
+                       FileUpload::make('images')
                         ->label('Product Images')
                         ->multiple()
                         ->image()
                         ->disk('public')
                         ->directory('product-variants')
-                        ->required()
-                        ->minFiles(1)
-                        ->maxFiles(10)
-                        ->maxSize(5120)
-                        ->acceptedFileTypes([
-                            'image/jpeg',
-                            'image/png',
-                            'image/webp',
-                        ])
-                        ->rules([
-                            'array',
-                            'min:1',
-                            'max:10',
-                        ])
+                        ->required(false)
                         ->columnSpanFull(),
+
                 ])
                 ->columns(3)
                 ->defaultItems(1)
-                ->minItems(1)
-                ->maxItems(50)
                 ->columnSpanFull()
-                ->required()
                 ->label('Product Variants'),
+                
 
             /*
              * DOKAN
@@ -236,30 +220,27 @@ class ProductForm
              * Do not allow the browser/user to freely choose
              * another vendor.
              */
-            Hidden::make('dokan_id')
-                ->default(function () {
-                    $user = Filament::auth()->user()
-                        ?? auth()->guard('dokan')->user();
-
-                    if (! $user) {
-                        return null;
-                    }
-
-                    if ($user instanceof Dokan) {
-                        return $user->id;
-                    }
-
-                    return Dokan::where('user_id', $user->id)
-                        ->value('id')
-                        ?? $user->dokan_id;
-                })
-                ->required()
-                ->integer()
-                ->rules([
-                    'integer',
-                    'exists:dokans,id',
-                ]),
-        ]);
+Select::make('dokan_id')
+    ->label('Seller')
+    ->options(function (): array {
+        return Dokan::query()
+            ->where('status', Dokan::STATUS_APPROVED)
+            ->orderBy('company_name')
+            ->get()
+            ->mapWithKeys(fn (Dokan $dokan): array => [
+                $dokan->id => ($dokan->company_name ?: $dokan->name ?: $dokan->email)
+                    . ' (' . $dokan->email . ')',
+            ])
+            ->all();
+    })
+    ->searchable()
+    ->preload()
+    ->required()
+    ->rules([
+        'integer',
+        'exists:dokans,id',
+    ]),
+            ]);
     }
 }
 

@@ -15,6 +15,8 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
+
             ->columns([
 
                 ImageColumn::make('first_variant_image')
