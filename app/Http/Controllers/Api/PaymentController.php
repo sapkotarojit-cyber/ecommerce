@@ -194,6 +194,11 @@ class PaymentController extends Controller
             'gateway_url' => $gatewayUrl,
             'payment_group_id' => $groupId,
             'transaction_uuid' => $transactionUuid,
+            'launch_url' => URL::temporarySignedRoute(
+                'payments.esewa.hosted',
+                now()->addMinutes(15),
+                ['group' => $groupId]
+            ),
             'amount' => $totalAmount,
             'product_code' => $merchantCode,
             'signed_field_names' => $signedFieldNames,
@@ -212,6 +217,83 @@ class PaymentController extends Controller
                 'failure_url' => route('api.payments.esewa.verify'),
             ],
         ]);
+    }
+
+    /**
+     * Render a signed, short-lived eSewa auto-submit form for the Flutter app.
+     * The signed URL avoids exposing the Laravel API bearer token in a browser URL.
+     */
+    public function hostedEsewaForm(Request $request, string $group)
+    {
+        $orders = Order::query()
+            ->where('payment_group_id', $group)
+            ->where('payment_method', 'esewa')
+            ->where('payment_status', 'pending')
+            ->orderBy('id')
+            ->get();
+
+        if ($orders->isEmpty()) {
+            return redirect()
+                ->route('home')
+                ->with('error', 'This eSewa payment is no longer pending.');
+        }
+
+        $transactionUuid = (string) $orders
+            ->pluck('payment_transaction_id')
+            ->filter()
+            ->first();
+
+        if ($transactionUuid === '') {
+            return redirect()
+                ->route('home')
+                ->with('error', 'The eSewa transaction is not initialized. Please retry checkout.');
+        }
+
+        $gatewayUrl = (string) config('services.esewa.url');
+        $merchantCode = (string) config('services.esewa.merchant_code');
+        $secretKey = (string) config('services.esewa.secret_key');
+
+        if ($gatewayUrl === '' || $merchantCode === '' || $secretKey === '') {
+            return redirect()
+                ->route('home')
+                ->with('error', 'eSewa is not configured on the server.');
+        }
+
+        $amount = number_format((float) $orders->sum(
+            fn (Order $order) => (float) $order->total_amount
+        ), 2, '.', '');
+
+        $signedFieldNames = 'total_amount,transaction_uuid,product_code';
+        $message = 'total_amount=' . $amount
+            . ',transaction_uuid=' . $transactionUuid
+            . ',product_code=' . $merchantCode;
+        $signature = base64_encode(hash_hmac('sha256', $message, $secretKey, true));
+
+        $firstOrder = $orders->first();
+        session([
+            'esewa_order_id' => $firstOrder->id,
+            'esewa_payment_group_id' => $group,
+            'esewa_transaction_uuid' => $transactionUuid,
+        ]);
+
+        $data = [
+            'gateway_url' => $gatewayUrl,
+            'amount' => $amount,
+            'tax_amount' => '0',
+            'total_amount' => $amount,
+            'transaction_uuid' => $transactionUuid,
+            'product_code' => $merchantCode,
+            'product_service_charge' => '0',
+            'product_delivery_charge' => '0',
+            'success_url' => route('esewa.success'),
+            'failure_url' => route('esewa.failure'),
+            'signed_field_names' => $signedFieldNames,
+            'signature' => $signature,
+        ];
+
+        return response()
+            ->view('frontend.payments.esewa-redirect', compact('data'))
+            ->header('Cache-Control', 'no-store, private');
     }
 
     /**
@@ -411,7 +493,9 @@ class PaymentController extends Controller
                     $inventory->deductForPayment($order);
                 }
 
-                // Remove purchased quantities only after payment is verified.
+                // The inventory service skips cart deletion for Flutter orders
+                // whose cart_removed_at marker is set, but still supports legacy
+                // web orders that remove purchased quantities at payment time.
                 foreach ($lockedOrders as $order) {
                     $inventory->removePurchasedCartItems($order);
                 }

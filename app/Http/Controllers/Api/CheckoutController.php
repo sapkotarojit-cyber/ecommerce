@@ -321,10 +321,12 @@ class CheckoutController extends Controller
                         ]);
 
                         /*
-                         * COD is finalized immediately.
+                         * Remove the selected cart row for every payment method.
+                         * Pending bank/eSewa orders are restored to the cart only
+                         * if the order is explicitly cancelled.
                          *
-                         * For bank/eSewa, preserve stock and cart until
-                         * payment has been independently verified.
+                         * COD deducts inventory immediately; online payment
+                         * inventory is deducted only after server-side verification.
                          */
                         if ($validated['payment_method'] === 'cod') {
                             $updated = ProductVarient::query()
@@ -337,22 +339,23 @@ class CheckoutController extends Controller
                                     'Stock changed during checkout. Please review your cart and try again.'
                                 );
                             }
+                        }
 
-                            /*
-                             * Delete only the cart row selected by this user.
-                             */
-                            $deleted = Cart::query()
-                                ->whereKey($item->id)
-                                ->where('user_id', $userId)
-                                ->delete();
+                        $deleted = Cart::query()
+                            ->whereKey($item->id)
+                            ->where('user_id', $userId)
+                            ->delete();
 
-                            if ($deleted !== 1) {
-                                throw new \RuntimeException(
-                                    'A selected cart item changed during checkout. Please try again.'
-                                );
-                            }
+                        if ($deleted !== 1) {
+                            throw new \RuntimeException(
+                                'A selected cart item changed during checkout. Please try again.'
+                            );
                         }
                     }
+
+                    $order->forceFill([
+                        'cart_removed_at' => now(),
+                    ])->save();
 
                     if ($validated['payment_method'] === 'cod') {
                         $order->forceFill([

@@ -48,6 +48,14 @@ class OrderController extends Controller
             'returnRequests',
         ])
             ->where('user_id', Auth::id())
+            // Do not show legacy abandoned online checkout attempts as order history.
+            // Confirmed orders later cancelled remain visible because their payment_status is paid.
+            ->where(function ($query) {
+                $query->whereNotIn('payment_method', ['esewa', 'bank'])
+                    ->orWhere('payment_status', '!=', 'failed')
+                    ->orWhere('order_status', '!=', 'cancelled')
+                    ->orWhereNotNull('payment_receipt');
+            })
             ->when(
                 $search !== '',
                 function ($query) use ($search) {
@@ -218,6 +226,54 @@ class OrderController extends Controller
                         ])->save();
                     }
 
+                    // Restore purchased cart quantities only if checkout removed
+                    // them. Merge with anything the customer added meanwhile.
+                    if (
+                        $order->cart_removed_at !== null
+                        && $order->cart_restored_at === null
+                    ) {
+                        foreach ($order->order_items as $item) {
+                            $variantId = (int) $item->varient_id;
+                            $quantity = (int) $item->qty;
+
+                            if ($variantId < 1 || $quantity < 1) {
+                                continue;
+                            }
+
+                            $variant = ProductVarient::query()
+                                ->whereKey($variantId)
+                                ->lockForUpdate()
+                                ->first();
+
+                            if (! $variant) {
+                                continue;
+                            }
+
+                            $cartRow = Cart::query()
+                                ->where('user_id', $order->user_id)
+                                ->where('varient_id', $variantId)
+                                ->orderBy('id')
+                                ->lockForUpdate()
+                                ->first();
+
+                            if ($cartRow) {
+                                $cartRow->increment('qty', $quantity);
+                            } else {
+                                Cart::query()->create([
+                                    'user_id' => $order->user_id,
+                                    'product_id' => $variant->product_id,
+                                    'varient_id' => $variant->id,
+                                    'dokan_id' => (int) $order->dokan_id,
+                                    'qty' => $quantity,
+                                ]);
+                            }
+                        }
+
+                        $order->forceFill([
+                            'cart_restored_at' => now(),
+                        ])->save();
+                    }
+
                     if (
                         ! $order
                             ->returnRequests()
@@ -257,6 +313,15 @@ class OrderController extends Controller
                     }
                 }
             );
+
+            // Clear stale checkout retry markers so a cancelled order group
+            // cannot be reused on the next checkout attempt.
+            session()->forget([
+                'checkout_pending_group_id',
+                'checkout_pending_cart_ids',
+                'checkout_pending_payment_method',
+                'checkout_cart_ids',
+            ]);
 
             // The cancellation transaction committed successfully.
             app(\App\Services\CatalogCache::class)->invalidate();
@@ -376,12 +441,11 @@ class OrderController extends Controller
         );
 
         if ($total <= 0) {
-            return redirect()
-                ->route('orders.index')
-                ->with(
-                    'error',
-                    'Invalid payment amount.'
-                );
+            return $this->failPendingPayment(
+                $firstOrder->id,
+                $groupId,
+                'Invalid eSewa payment amount. The order was cancelled and items were restored to your cart.'
+            );
         }
 
         $productCode = (string) config(
@@ -400,12 +464,11 @@ class OrderController extends Controller
             $productCode === '' ||
             $secret === ''
         ) {
-            return redirect()
-                ->route('orders.index')
-                ->with(
-                    'error',
-                    'eSewa payment is not configured.'
-                );
+            return $this->failPendingPayment(
+                $firstOrder->id,
+                $groupId,
+                'eSewa payment is not configured. The order was cancelled and items were restored to your cart.'
+            );
         }
 
         $uuid =
@@ -698,30 +761,20 @@ class OrderController extends Controller
         }
 
         $order = Order::query()
-            ->where(
-                'user_id',
-                Auth::id()
+            // Web checkout requires the logged-in owner. The Flutter hosted
+            // form uses a short-lived signed URL and a session-bound group ID,
+            // so its external browser may not have the website login cookie.
+            ->when(
+                Auth::check(),
+                fn ($q) => $q->where('user_id', Auth::id())
             )
             ->when(
                 $groupId !== '',
-                fn ($q) =>
-                    $q->where(
-                        'payment_group_id',
-                        $groupId
-                    ),
-                fn ($q) =>
-                    $q->whereKey(
-                        $orderId
-                    )
+                fn ($q) => $q->where('payment_group_id', $groupId),
+                fn ($q) => $q->whereKey($orderId)
             )
-            ->where(
-                'payment_method',
-                'esewa'
-            )
-            ->where(
-                'payment_status',
-                'pending'
-            )
+            ->where('payment_method', 'esewa')
+            ->where('payment_status', 'pending')
             ->first();
 
         if (! $order) {
@@ -755,22 +808,16 @@ class OrderController extends Controller
         }
 
         $orders = Order::query()
-            ->where(
-                'user_id',
-                Auth::id()
+            ->when(
+                Auth::check(),
+                fn ($q) => $q->where('user_id', Auth::id())
             )
             ->where(
                 'payment_group_id',
                 $order->payment_group_id ?: $order->id
             )
-            ->where(
-                'payment_method',
-                'esewa'
-            )
-            ->where(
-                'payment_status',
-                'pending'
-            )
+            ->where('payment_method', 'esewa')
+            ->where('payment_status', 'pending')
             ->get();
 
         if ($orders->isEmpty()) {
@@ -1782,14 +1829,26 @@ class OrderController extends Controller
         string $message
     ) {
         $query = Order::query()
-            ->where(
-                'user_id',
-                Auth::id()
+            ->when(
+                Auth::check(),
+                fn ($q) => $q->where('user_id', Auth::id())
             )
-            ->where(
-                'payment_status',
-                'pending'
-            );
+            ->where('payment_status', 'pending')
+            // This handler is for abandoning an online payment attempt only.
+            // Never delete COD orders or bank orders that already have a submitted receipt.
+            ->where(function ($q) {
+                $q->where('payment_method', 'esewa')
+                    ->orWhere(function ($bank) {
+                        $bank->where('payment_method', 'bank')
+                            ->whereNull('payment_receipt');
+                    });
+            });
+
+        if (! Auth::check() && $groupId === '') {
+            return redirect()
+                ->route('home')
+                ->with('error', 'Payment session expired. Please check your orders in the app.');
+        }
 
         if (
             $groupId !== ''
@@ -1818,6 +1877,10 @@ class OrderController extends Controller
                 'esewa_transaction_uuid',
                 'bank_order_id',
                 'bank_payment_group_id',
+                'checkout_pending_group_id',
+                'checkout_pending_cart_ids',
+                'checkout_pending_payment_method',
+                'checkout_cart_ids',
             ]);
 
             return redirect()
@@ -1853,16 +1916,18 @@ class OrderController extends Controller
                         continue;
                     }
 
-                    if (empty($locked->cart_restored_at)) {
-                        // Aggregate duplicate order lines for the same variant.
-                        // Online checkout leaves cart rows in place, so restore by
-                        // REPLACING the matching quantity, never incrementing it.
+                    if (
+                        $locked->cart_removed_at !== null
+                        && $locked->cart_restored_at === null
+                    ) {
+                        // Cart rows were removed at order creation. Merge purchased
+                        // quantities back without overwriting newer cart quantities.
                         $quantities = $locked->order_items
                             ->groupBy('varient_id')
                             ->map(fn ($rows) => (int) $rows->sum('qty'));
 
                         foreach ($quantities as $variantId => $quantity) {
-                            if ($quantity < 1) {
+                            if ((int) $quantity < 1) {
                                 continue;
                             }
 
@@ -1871,7 +1936,6 @@ class OrderController extends Controller
                                 ->lockForUpdate()
                                 ->first();
 
-                            // A deleted variant cannot be re-added to the cart.
                             if (! $variant) {
                                 continue;
                             }
@@ -1884,37 +1948,28 @@ class OrderController extends Controller
                                 ->first();
 
                             if ($existing) {
-                                // Replace instead of incrementing; the cart row
-                                // usually already exists from online checkout.
-                                $existing->update([
-                                    'product_id' => $variant->product_id,
-                                    'dokan_id' => $locked->dokan_id,
-                                    'qty' => $quantity,
-                                ]);
+                                $existing->increment('qty', (int) $quantity);
                             } else {
                                 Cart::create([
                                     'user_id' => $locked->user_id,
                                     'product_id' => $variant->product_id,
                                     'varient_id' => $variant->id,
-                                    'dokan_id' => $locked->dokan_id,
-                                    'qty' => $quantity,
+                                    'dokan_id' => (int) $locked->dokan_id,
+                                    'qty' => (int) $quantity,
                                 ]);
                             }
                         }
 
-                        // This timestamp guards against duplicate restoration.
                         $locked->forceFill([
                             'cart_restored_at' => now(),
                         ])->save();
                     }
 
-                    $locked->update([
-                        'payment_status' =>
-                            'failed',
-
-                        'order_status' =>
-                            'cancelled',
-                    ]);
+                    // Checkout abandonment is not an order cancellation.
+                    // Delete the unconfirmed payment attempt (order_items cascade on delete)
+                    // so it never appears as a cancelled order in history. The cart has
+                    // already been restored above in this same transaction.
+                    $locked->delete();
                 }
             }
         );
@@ -1925,6 +1980,10 @@ class OrderController extends Controller
             'esewa_transaction_uuid',
             'bank_order_id',
             'bank_payment_group_id',
+            'checkout_pending_group_id',
+            'checkout_pending_cart_ids',
+            'checkout_pending_payment_method',
+            'checkout_cart_ids',
         ]);
 
         return redirect()

@@ -89,6 +89,13 @@ class OrderInventoryService
      */
     public function removePurchasedCartItems(Order $order): void
     {
+        // Flutter checkout removes the selected cart rows transactionally when
+        // it creates the order. Do not delete by variant again after payment:
+        // the customer may have added new quantities while payment was pending.
+        if ($order->cart_removed_at !== null) {
+            return;
+        }
+
         foreach ($order->order_items as $item) {
             $remaining = (int) $item->qty;
 

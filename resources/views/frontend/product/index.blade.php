@@ -129,6 +129,11 @@
                                                 {{ $product->title }}
                                             </h3>
                                         </a>
+                                        @if($product->varients->count() > 1)
+                                            <p class="mt-1 text-xs text-gray-500">
+                                                {{ $product->varients->count() }} variants available · Choose on product page
+                                            </p>
+                                        @endif
                                         <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                                             <div>
                                                 @if($variant)

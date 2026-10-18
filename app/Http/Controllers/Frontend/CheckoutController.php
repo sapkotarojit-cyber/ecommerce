@@ -433,11 +433,8 @@ class CheckoutController extends Controller
                             ),
                         ]);
 
-                        /*
-                         * Only COD finalizes stock/cart during checkout.
-                         * Online payment is finalized after gateway/admin
-                         * verification in the corresponding payment handler.
-                         */
+                        // COD reserves stock immediately. Online payments reserve
+                        // stock only after payment is independently verified.
                         if ($validated['payment_method'] === 'cod') {
                             $updated = ProductVarient::query()
                                 ->whereKey($variant->id)
@@ -449,10 +446,25 @@ class CheckoutController extends Controller
                                     'Stock changed during checkout. Please review your cart and try again.'
                                 );
                             }
+                        }
 
-                            $item->delete();
+                        // Remove purchased cart rows for every payment method.
+                        // Cancellation/definitive failure restores them once.
+                        $deleted = Cart::query()
+                            ->whereKey($item->id)
+                            ->where('user_id', $userId)
+                            ->delete();
+
+                        if ($deleted !== 1) {
+                            throw new \RuntimeException(
+                                'A selected cart item changed during checkout. Please try again.'
+                            );
                         }
                     }
+
+                    $order->forceFill([
+                        'cart_removed_at' => now(),
+                    ])->save();
 
                     if ($validated['payment_method'] === 'cod') {
                         $order->forceFill([

@@ -6,6 +6,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use App\Http\Controllers\Frontend\AuthController;
 use App\Http\Controllers\Frontend\PageController;
 use App\Http\Controllers\Frontend\ShippingAddressController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\OrderController;
 use App\Http\Controllers\Frontend\CheckoutController;
@@ -274,6 +275,14 @@ Route::middleware('auth')->group(function () {
 
 
 /* Payment Callbacks */
+
+/*
+ * Short-lived signed URL used by the Flutter app to submit the server-signed
+ * eSewa form. It deliberately does not require a browser login session.
+ */
+Route::get('/payment/esewa/launch/{group}', [PaymentController::class, 'hostedEsewaForm'])
+    ->middleware('signed')
+    ->name('payments.esewa.hosted');
 
 Route::match(['get', 'post'], '/payment/esewa/success', [OrderController::class, 'esewaSuccess'])
     ->withoutMiddleware(VerifyCsrfToken::class)

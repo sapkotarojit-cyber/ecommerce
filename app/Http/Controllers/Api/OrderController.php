@@ -87,6 +87,13 @@ class OrderController extends Controller
                 'user_id',
                 Auth::id()
             )
+            // Hide legacy failed online checkout attempts; confirmed cancellations remain visible.
+            ->where(function ($query) {
+                $query->whereNotIn('payment_method', ['esewa', 'bank'])
+                    ->orWhere('payment_status', '!=', 'failed')
+                    ->orWhere('order_status', '!=', 'cancelled')
+                    ->orWhereNotNull('payment_receipt');
+            })
             ->when(
                 $search !== '',
                 function ($query) use ($search) {

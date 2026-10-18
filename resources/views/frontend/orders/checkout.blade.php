@@ -33,9 +33,7 @@
                         </div>
 
                         <div>
-                            <div id="no-address-msg" class="{{ $addresses->isNotEmpty() ? 'hidden' : '' }}">
-                                <p class="text-sm text-gray-500 py-2">No shipping addresses found. Please add an address to proceed.</p>
-                            </div>
+                            
 
                             <div id="address-list-container" class="space-y-3">
     @if(isset($addresses) && $addresses->count() > 0)
@@ -191,7 +189,9 @@
 
                     <div class="mt-6 flex justify-end space-x-3">
                         <button type="button" @click="closeModal()" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 text-xs font-semibold uppercase tracking-wider">Cancel</button>
-                        <button type="submit" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-xs uppercase tracking-wider">Save Address</button>
+                        <button type="submit" :disabled="savingAddress" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-xs uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed">
+                            <span x-text="savingAddress ? 'Saving...' : 'Save Address'">Save Address</span>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -203,6 +203,7 @@
 function checkoutPage() {
     return {
         showAddressModal: false,
+        savingAddress: false,
         form: {
             name: '',
             address_type: '',
@@ -217,45 +218,73 @@ function checkoutPage() {
             this.showAddressModal = false;
             this.form = { name: '', address_type: '', phone: '', region: '', address: '' };
         },
-        saveAddress() {
-            fetch("{{ route('shipping-address.quick-store') }}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRF-TOKEN": "{{ csrf_token() }}",
-                    "Accept": "application/json"
-                },
-                body: JSON.stringify(this.form)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const address = data.address;
-                    
-                    const newAddressHtml = `
-                        <label class="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50">
-                            <input type="radio" name="shipping_address_id" value="${address.id}" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1" checked required>
-                            <div>
-                                <p class="font-semibold text-gray-800">${address.name} <span class="text-xs font-normal text-gray-500">(${address.address_type})</span></p>
-                                <p class="text-sm text-gray-600">${address.address}</p>
-                                <p class="text-sm text-gray-600">${address.region} | Phone: ${address.phone}</p>
-                            </div>
-                        </label>
-                    `;
+        async saveAddress() {
+            if (this.savingAddress) return;
+            this.savingAddress = true;
 
-                    const container = document.getElementById('address-list-container');
-                    container.classList.remove('hidden');
-                    container.insertAdjacentHTML('beforeend', newAddressHtml);
+            try {
+                const response = await fetch("{{ route('shipping-address.quick-store') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": "{{ csrf_token() }}",
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify(this.form)
+                });
 
-                    document.getElementById('no-address-msg').classList.add('hidden');
-                    document.getElementById('submit-order-btn').removeAttribute('disabled');
-
-                    this.closeModal();
-                } else {
-                    alert(data.message || 'Error saving address.');
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success || !data.address) {
+                    alert(data.message || 'Unable to save the shipping address. Please check the details and try again.');
+                    return;
                 }
-            })
-            .catch(error => console.error("Error adding address:", error));
+
+                const address = data.address;
+                const container = document.getElementById('address-list-container');
+                const existingRadio = container.querySelector(`input[name="shipping_address_id"][value="${Number(address.id)}"]`);
+
+                if (existingRadio) {
+                    existingRadio.checked = true;
+                } else {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50';
+
+                    const radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = 'shipping_address_id';
+                    radio.value = String(address.id);
+                    radio.checked = true;
+                    radio.required = true;
+                    radio.className = 'h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1';
+
+                    const details = document.createElement('div');
+                    const title = document.createElement('p');
+                    title.className = 'font-semibold text-gray-800';
+                    title.textContent = `${address.name} (${address.address_type})`;
+                    const line1 = document.createElement('p');
+                    line1.className = 'text-sm text-gray-600';
+                    line1.textContent = address.address;
+                    const line2 = document.createElement('p');
+                    line2.className = 'text-sm text-gray-600';
+                    line2.textContent = `${address.region} | Phone: ${address.phone}`;
+
+                    details.append(title, line1, line2);
+                    label.append(radio, details);
+                    container.appendChild(label);
+                }
+
+                container.classList.remove('hidden');
+                document.getElementById('no-address-msg')?.classList.add('hidden');
+                document.getElementById('submit-order-btn')?.removeAttribute('disabled');
+
+                this.closeModal();
+                alert(data.message || 'Shipping address has been added successfully.');
+            } catch (error) {
+                alert('Unable to save the shipping address. Please check your connection and try again.');
+            } finally {
+                this.savingAddress = false;
+            }
         }
     };
 }

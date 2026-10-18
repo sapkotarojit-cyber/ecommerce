@@ -22,6 +22,7 @@ class Order extends Model
         'stock_deducted_at',
         'stock_restored_at',
         'cart_restored_at',
+        'cart_removed_at',
     ];
 
     protected $casts = [
@@ -29,6 +30,7 @@ class Order extends Model
         'stock_deducted_at' => 'datetime',
         'stock_restored_at' => 'datetime',
         'cart_restored_at' => 'datetime',
+        'cart_removed_at' => 'datetime',
     ];
 
     protected static function boot()

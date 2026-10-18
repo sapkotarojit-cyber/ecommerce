@@ -62,6 +62,29 @@
                         );
                     @endphp
 
+                    @php
+                        $variantOptions = $product->varients->map(function ($variant) {
+                            $variantImages = is_array($variant->images) ? $variant->images : [];
+                            $firstImage = $variantImages[0] ?? null;
+                            $imageUrl = null;
+
+                            if (is_string($firstImage) && $firstImage !== '') {
+                                $imageUrl = filter_var($firstImage, FILTER_VALIDATE_URL)
+                                    ? $firstImage
+                                    : asset('storage/' . ltrim($firstImage, '/'));
+                            }
+
+                            return [
+                                'id' => (int) $variant->id,
+                                'title' => (string) ($variant->title ?: 'Variant #' . $variant->id),
+                                'price' => (float) $variant->price,
+                                'discount' => (float) $variant->discount,
+                                'qty' => (int) $variant->qty,
+                                'image_url' => $imageUrl,
+                            ];
+                        })->values();
+                    @endphp
+
                     <!-- Main Image -->
                     <div class="mb-4 h-96 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
 
@@ -129,45 +152,41 @@
                             {{ $product->title }}
                         </h1>
 
-                        <!-- Price -->
+                        <!-- Price updates whenever a different variant is selected -->
                         @if($firstVariant)
-
-                            @php
-                                $price = (float) $firstVariant->price;
-                                $discount = (float) $firstVariant->discount;
-                                $finalPrice = $price - ($price * $discount / 100);
-                            @endphp
-
-                            <div class="mb-6">
-
-                                @if($discount > 0)
-
-                                    <div class="flex items-baseline gap-3">
-
-                                        <span class="text-2xl font-bold text-[#1a2a6c]">
-                                            Rs. {{ number_format($finalPrice, 2) }}
-                                        </span>
-
-                                        <span class="text-gray-400 line-through">
-                                            Rs. {{ number_format($price, 2) }}
-                                        </span>
-
-                                        <span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-semibold">
-                                            {{ $discount }}% OFF
-                                        </span>
-
-                                    </div>
-
-                                @else
-
-                                    <span class="text-2xl font-bold text-[#1a2a6c]">
-                                        Rs. {{ number_format($price, 2) }}
-                                    </span>
-
-                                @endif
-
+                            <div class="mb-5">
+                                <label for="product-variant-select" class="block text-sm font-semibold text-gray-700 mb-2">
+                                    Available variants ({{ $product->varients->count() }})
+                                </label>
+                                <select
+                                    id="product-variant-select"
+                                    x-model="varient_id"
+                                    @change="selectVariant()"
+                                    class="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#c9a84c] focus:border-[#c9a84c]"
+                                >
+                                    <template x-for="variant in variants" :key="variant.id">
+                                        <option
+                                            :value="String(variant.id)"
+                                            x-text="variant.title + ' — Rs. ' + formatPrice(variant.price - (variant.price * variant.discount / 100)) + (variant.qty < 1 ? ' (Out of stock)' : '')"
+                                        ></option>
+                                    </template>
+                                </select>
                             </div>
 
+                            <div class="mb-6">
+                                <div class="flex items-baseline flex-wrap gap-3">
+                                    <span class="text-2xl font-bold text-[#1a2a6c]"
+                                          x-text="'Rs. ' + formatPrice(currentPrice - (currentPrice * currentDiscount / 100))"></span>
+                                    <span x-show="currentDiscount > 0"
+                                          x-text="'Rs. ' + formatPrice(currentPrice)"
+                                          class="text-gray-400 line-through"></span>
+                                    <span x-show="currentDiscount > 0"
+                                          x-text="currentDiscount + '% OFF'"
+                                          class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-semibold"></span>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-500"
+                                   x-text="currentQty > 0 ? currentQty + ' in stock' : 'Currently out of stock'"></p>
+                            </div>
                         @endif
 
                         <!-- Description -->
@@ -199,13 +218,13 @@
                                     type="number"
                                     x-model.number="qty"
                                     min="1"
-                                    max="{{ $firstVariant->qty }}"
+                                    :max="currentQty"
+                                    :disabled="currentQty < 1"
                                     class="w-20 px-3 py-2 border border-gray-200 rounded-lg text-center focus:ring-2 focus:ring-[#c9a84c]"
                                 >
 
-                                <span class="text-xs text-gray-500">
-                                    ({{ $firstVariant->qty }} in stock)
-                                </span>
+                                <span class="text-xs text-gray-500"
+                                      x-text="currentQty > 0 ? '(' + currentQty + ' in stock)' : '(Out of stock)'"></span>
 
                             </div>
 
@@ -214,7 +233,7 @@
 
                                 <button
                                     type="submit"
-                                    :disabled="loading || buyNowLoading"
+                                    :disabled="currentQty < 1 || loading || buyNowLoading"
                                     class="flex-1 py-3 px-6 bg-[#1a2a6c] hover:bg-[#2a3a7c] text-white font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
                                     <i
@@ -232,7 +251,7 @@
                                 <button
                                     type="button"
                                     @click="buyNow"
-                                    :disabled="loading || buyNowLoading"
+                                    :disabled="currentQty < 1 || loading || buyNowLoading"
                                     class="flex-1 py-3 px-6 bg-[#c9a84c] hover:bg-[#b8963a] text-white font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
                                     <i
@@ -466,10 +485,47 @@
 function cartComponent() {
     return {
         varient_id: "{{ $firstVariant?->id }}",
+        variants: @json($variantOptions),
+        currentPrice: {{ (float) ($firstVariant?->price ?? 0) }},
+        currentDiscount: {{ (float) ($firstVariant?->discount ?? 0) }},
+        currentQty: {{ (int) ($firstVariant?->qty ?? 0) }},
         qty: 1,
         loading: false,
         buyNowLoading: false,
         showModal: false,
+
+        formatPrice(value) {
+            return Number(value || 0).toLocaleString('en-NP', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        },
+
+        selectVariant() {
+            const variant = this.variants.find(item => String(item.id) === String(this.varient_id));
+            if (!variant) return;
+
+            this.currentPrice = Number(variant.price || 0);
+            this.currentDiscount = Number(variant.discount || 0);
+            this.currentQty = Number(variant.qty || 0);
+            this.qty = Math.max(1, Math.min(Number(this.qty || 1), Math.max(1, this.currentQty)));
+
+            if (variant.image_url) {
+                let image = document.getElementById('main-image');
+                if (!image) {
+                    const gallery = document.querySelector('.mb-4.h-96');
+                    if (gallery) {
+                        gallery.replaceChildren();
+                        image = document.createElement('img');
+                        image.id = 'main-image';
+                        image.alt = @json($product->title);
+                        image.className = 'w-full h-full object-cover';
+                        gallery.appendChild(image);
+                    }
+                }
+                if (image) image.src = variant.image_url;
+            }
+        },
 
         async addToCart() {
             @if(!Auth::check())

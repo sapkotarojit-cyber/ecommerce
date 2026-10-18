@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Cart;
 use App\Models\Order;
 use App\Models\ProductVarient;
 use App\Models\ReturnRequest;
@@ -75,6 +76,57 @@ class OrderService
 
                 $order->forceFill([
                     'stock_restored_at' => now(),
+                ])->save();
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Restore the purchased quantities to the user's cart
+            |--------------------------------------------------------------------------
+            |
+            | The timestamp makes this operation idempotent. Lock the order and
+            | cart rows in this transaction so repeated cancellation requests
+            | cannot duplicate the restored quantities.
+            */
+
+            if (
+                $order->cart_removed_at !== null
+                && $order->cart_restored_at === null
+            ) {
+                foreach ($order->order_items as $item) {
+                    $variantId = (int) $item->varient_id;
+                    $productId = (int) $item->product_id;
+                    $quantity = (int) $item->qty;
+
+                    if ($variantId < 1 || $productId < 1 || $quantity < 1) {
+                        throw new RuntimeException(
+                            'ORDER_CART_RESTORE_INVALID'
+                        );
+                    }
+
+                    $cartRow = Cart::query()
+                        ->where('user_id', $order->user_id)
+                        ->where('varient_id', $variantId)
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($cartRow) {
+                        $cartRow->qty = (int) $cartRow->qty + $quantity;
+                        $cartRow->save();
+                    } else {
+                        Cart::query()->create([
+                            'user_id' => $order->user_id,
+                            'varient_id' => $variantId,
+                            'product_id' => $productId,
+                            'dokan_id' => (int) $order->dokan_id,
+                            'qty' => $quantity,
+                        ]);
+                    }
+                }
+
+                $order->forceFill([
+                    'cart_restored_at' => now(),
                 ])->save();
             }
 

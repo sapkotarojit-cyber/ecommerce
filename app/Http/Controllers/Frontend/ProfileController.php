@@ -90,13 +90,22 @@ class ProfileController extends Controller
                     'current_password',
                 ],
 
-                'password' => [
+                                    'password' => [
+                            'bail',
+                            'required',
+                            'string',
+                            'min:8',
+                            'max:128',
+                            'confirmed',
+                            PasswordRule::defaults(),
+                        ],
+
+                'password_confirmation' => [
+                    'bail',
                     'required',
                     'string',
                     'min:8',
                     'max:128',
-                    'confirmed',
-                    PasswordRule::defaults(),
                 ],
             ]);
 

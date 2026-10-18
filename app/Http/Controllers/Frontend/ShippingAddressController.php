@@ -110,6 +110,31 @@ class ShippingAddressController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $normalized = [
+                'name' => trim($validated['name']),
+                'phone' => trim($validated['phone']),
+                'region' => trim($validated['region']),
+                'address' => trim($validated['address']),
+                'landmark' => trim((string) ($validated['landmark'] ?? '')),
+                'address_type' => $validated['address_type'],
+            ];
+
+            // Repeated submits of the same address are idempotent.
+            $existing = ShippingAddress::query()
+                ->where('user_id', Auth::id())
+                ->where('name', $normalized['name'])
+                ->where('phone', $normalized['phone'])
+                ->where('region', $normalized['region'])
+                ->where('address', $normalized['address'])
+                ->where('address_type', $normalized['address_type'])
+                ->whereRaw("COALESCE(landmark, '') = ?", [$normalized['landmark']])
+                ->first();
+
+            if ($existing) {
+                $existing->setAttribute('_was_existing', true);
+                return $existing;
+            }
+
             $makeDefault = (bool) (
                 $validated['is_default_shipping'] ?? false
             );
@@ -125,16 +150,16 @@ class ShippingAddressController extends Controller
             $address = ShippingAddress::create([
                 'user_id' => Auth::id(),
 
-                'name' => trim($validated['name']),
+                'name' => $normalized['name'],
 
-                'phone' => trim($validated['phone']),
+                'phone' => $normalized['phone'],
 
-                'region' => trim($validated['region']),
+                'region' => $normalized['region'],
 
-                'address' => trim($validated['address']),
+                'address' => $normalized['address'],
 
-                'landmark' => isset($validated['landmark'])
-                    ? trim($validated['landmark'])
+                'landmark' => $normalized['landmark'] !== ''
+                    ? $normalized['landmark']
                     : null,
 
                 'address_type' => $validated['address_type'],
@@ -168,7 +193,7 @@ class ShippingAddressController extends Controller
             ->route('shipping-address.index')
             ->with(
                 'success',
-                'Shipping address added successfully!'
+                'Shipping address has been added successfully.'
             );
     }
 
@@ -232,42 +257,53 @@ class ShippingAddressController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $normalized = [
+                'name' => trim($validated['name']),
+                'address_type' => $validated['address_type'],
+                'phone' => trim($validated['phone']),
+                'region' => trim($validated['region']),
+                'address' => trim($validated['address']),
+                'landmark' => trim((string) ($validated['landmark'] ?? '')),
+            ];
+
+            $existing = ShippingAddress::query()
+                ->where('user_id', Auth::id())
+                ->where('name', $normalized['name'])
+                ->where('address_type', $normalized['address_type'])
+                ->where('phone', $normalized['phone'])
+                ->where('region', $normalized['region'])
+                ->where('address', $normalized['address'])
+                ->whereRaw("COALESCE(landmark, '') = ?", [$normalized['landmark']])
+                ->first();
+
+            if ($existing) {
+                $existing->setAttribute('_was_existing', true);
+                return $existing;
+            }
+
             $hasAddress = ShippingAddress::query()
                 ->where('user_id', Auth::id())
                 ->exists();
 
             return ShippingAddress::create([
                 'user_id' => Auth::id(),
-
-                'name' => trim($validated['name']),
-
-                'address_type' =>
-                    $validated['address_type'],
-
-                'phone' =>
-                    trim($validated['phone']),
-
-                'region' =>
-                    trim($validated['region']),
-
-                'address' =>
-                    trim($validated['address']),
-
-                'landmark' =>
-                    isset($validated['landmark'])
-                        ? trim($validated['landmark'])
-                        : null,
-
-                'is_default_shipping' =>
-                    !$hasAddress,
-
+                'name' => $normalized['name'],
+                'address_type' => $normalized['address_type'],
+                'phone' => $normalized['phone'],
+                'region' => $normalized['region'],
+                'address' => $normalized['address'],
+                'landmark' => $normalized['landmark'] !== ''
+                    ? $normalized['landmark']
+                    : null,
+                'is_default_shipping' => !$hasAddress,
                 'is_default_billing' => false,
             ]);
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'Address added successfully!',
+            'message' => 'Shipping address has been added successfully.',
+            'created' => ! (bool) $address->getAttribute('_was_existing'),
             'address' => $address,
         ]);
     }
