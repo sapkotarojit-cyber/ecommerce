@@ -478,15 +478,23 @@ class AuthController extends Controller
         }
     }
 
-    public function redirect()
-    {
-        try {
-            return Socialite::driver('google')->stateless()->redirect();
-        } catch (\Throwable $e) {
-            Log::error('Google redirect error', ['message' => $e->getMessage()]);
-            return redirect()->route('login')->with('error', 'Unable to connect to Google. Please try again.');
-        }
+public function redirect()
+{
+    try {
+        return Socialite::driver('google')
+            ->stateless()
+            ->with(['prompt' => 'login'])
+            ->redirect();
+    } catch (\Throwable $e) {
+        Log::error('Google redirect error', [
+            'message' => $e->getMessage(),
+        ]);
+
+        return redirect()->route('login')
+            ->with('error', 'Unable to connect to Google. Please try again.');
     }
+}
+
 
     public function callback()
     {

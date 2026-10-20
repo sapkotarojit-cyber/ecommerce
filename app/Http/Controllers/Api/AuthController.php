@@ -187,23 +187,56 @@ class AuthController extends Controller
         return response()->json(['success' => true, 'message' => 'Google login successful.', 'token' => $plainTextToken, 'user' => $this->userData($user)]);
     }
 
-    /** Start Socialite OAuth; Linux Flutter may supply a temporary localhost callback. */
+    /** Start Socialite OAuth and ask Google to reauthenticate the account. */
     public function googleRedirect(Request $request)
     {
         $this->configureGoogleApiRedirect();
         $callbackUrl = $request->query('callback');
+
         if ($callbackUrl !== null) {
-            if (! is_string($callbackUrl) || strlen($callbackUrl) > 2048) return response('Invalid Google OAuth callback.', 400);
-            $callback = parse_url($callbackUrl);
-            $port = is_array($callback) ? ($callback['port'] ?? null) : null;
-            if (! is_array($callback) || ($callback['scheme'] ?? null) !== 'http' || ($callback['host'] ?? null) !== '127.0.0.1' || ! is_int($port) || $port < 1 || $port > 65535 || isset($callback['user']) || isset($callback['pass']) || isset($callback['query']) || isset($callback['fragment']) || ! in_array($callback['path'] ?? '', ['', '/'], true)) {
+            if (! is_string($callbackUrl) || strlen($callbackUrl) > 2048) {
                 return response('Invalid Google OAuth callback.', 400);
             }
+
+            $callback = parse_url($callbackUrl);
+            $port = is_array($callback) ? ($callback['port'] ?? null) : null;
+
+            if (
+                ! is_array($callback) ||
+                ($callback['scheme'] ?? null) !== 'http' ||
+                ($callback['host'] ?? null) !== '127.0.0.1' ||
+                ! is_int($port) ||
+                $port < 1 ||
+                $port > 65535 ||
+                isset($callback['user']) ||
+                isset($callback['pass']) ||
+                isset($callback['query']) ||
+                isset($callback['fragment']) ||
+                ! in_array($callback['path'] ?? '', ['', '/'], true)
+            ) {
+                return response('Invalid Google OAuth callback.', 400);
+            }
+
             $state = Str::random(64);
-            Cache::put('google_oauth_callback:' . $state, rtrim($callbackUrl, '/'), now()->addMinutes(5));
-            return Socialite::driver('google')->stateless()->with(['state' => $state])->redirect();
+            Cache::put(
+                'google_oauth_callback:' . $state,
+                rtrim($callbackUrl, '/'),
+                now()->addMinutes(5)
+            );
+
+            return Socialite::driver('google')
+                ->stateless()
+                ->with([
+                    'state' => $state,
+                    'prompt' => 'login',
+                ])
+                ->redirect();
         }
-        return Socialite::driver('google')->stateless()->redirect();
+
+        return Socialite::driver('google')
+            ->stateless()
+            ->with(['prompt' => 'login'])
+            ->redirect();
     }
 
     /** Complete Google OAuth and return the result to Flutter. */

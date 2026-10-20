@@ -1383,17 +1383,18 @@ class OrderController extends Controller
                 'tracking_number' => [
                     'required',
                     'string',
-                    'min:3',
+                    'min:1',
                     'max:100',
-                    'regex:/^[A-Za-z0-9._-]+$/',
+                    'regex:/^#?[A-Za-z0-9._-]+$/',
                 ],
             ]
         );
 
-        $tracking =
-            trim(
-                $validated['tracking_number']
-            );
+        // Accept an order ID entered as either 123 or #123.
+        $tracking = trim($validated['tracking_number']);
+        $tracking = preg_replace('/^#\s*/', '', $tracking) ?? $tracking;
+
+        $normalizedTracking = mb_strtolower($tracking, 'UTF-8');
 
         $order = Order::with([
             'order_items.product',
@@ -1401,24 +1402,19 @@ class OrderController extends Controller
             'shipping_address',
             'dokan',
         ])
-            ->where(
-                function ($q) use (
-                    $tracking
-                ) {
-                    $q->where(
-                        'tracking_number',
-                        $tracking
-                    );
+            ->where(function ($q) use ($tracking, $normalizedTracking) {
+                // Match tracking numbers even if capitalization or surrounding
+                // whitespace differs between the stored value and form input.
+                $q->whereRaw(
+                    'LOWER(TRIM(tracking_number)) = ?',
+                    [$normalizedTracking]
+                );
 
-                    if (
-                        ctype_digit(
-                            $tracking
-                        )
-                    ) {
-                        $q->orWhere('id', (int) $tracking);
-                    }
+                // Keep the existing numeric order-ID lookup working too.
+                if (ctype_digit($tracking)) {
+                    $q->orWhere('id', (int) $tracking);
                 }
-            )
+            })
             ->first();
 
         if (! $order) {

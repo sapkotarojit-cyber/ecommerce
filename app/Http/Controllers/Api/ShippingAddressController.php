@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ShippingAddress;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ShippingAddressController extends Controller
 {
@@ -26,7 +29,7 @@ class ShippingAddressController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $validated = $this->validateStrict($request, [
+        $validated = $request->validate([
             'name' => ['bail', 'required', 'string', 'min:2', 'max:100', 'regex:/^[\pL\pM\pN .\'-]+$/u'],
             'phone' => ['bail', 'required', 'string', 'min:7', 'max:20', 'regex:/^[0-9+()\-.\s]+$/'],
             'region' => ['bail', 'required', 'string', 'min:2', 'max:100'],
@@ -35,22 +38,27 @@ class ShippingAddressController extends Controller
             'address_type' => ['bail', 'required', 'string', 'max:20', 'in:home,office,work,other'],
         ]);
 
-        $address = ShippingAddress::create([
-            'user_id' => (int) Auth::id(),
-            'name' => trim($validated['name']),
-            'phone' => trim($validated['phone']),
-            'region' => trim($validated['region']),
-            'address' => trim($validated['address']),
-            'landmark' => isset($validated['landmark']) && $validated['landmark'] !== null && trim((string) $validated['landmark']) !== ''
-                ? trim((string) $validated['landmark'])
-                : null,
-            'address_type' => strtolower(trim($validated['address_type'])),
-            'is_default_shipping' => false,
-            'is_default_billing' => false,
-        ]);
+        $address = DB::transaction(function () use ($validated) {
+            $userId = (int) Auth::id();
+            User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+            $hasAddress = ShippingAddress::query()->where('user_id', $userId)->exists();
+
+            $landmark = trim((string) ($validated['landmark'] ?? ''));
+            return ShippingAddress::create([
+                'user_id' => $userId,
+                'name' => trim($validated['name']),
+                'phone' => trim($validated['phone']),
+                'region' => trim($validated['region']),
+                'address' => trim($validated['address']),
+                'landmark' => $landmark !== '' ? $landmark : null,
+                'address_type' => strtolower(trim($validated['address_type'])),
+                // The first address becomes the default automatically.
+                'is_default_shipping' => !$hasAddress,
+                'is_default_billing' => false,
+            ]);
+        });
 
         $address->refresh();
-
         return response()->json([
             'success' => true,
             'message' => 'Shipping address created successfully.',
@@ -60,28 +68,46 @@ class ShippingAddressController extends Controller
 
     public function destroy(int $address): JsonResponse
     {
-        $shippingAddress = ShippingAddress::query()
-            ->whereKey($address)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $userId = (int) Auth::id();
 
-        $shippingAddress->delete();
+        DB::transaction(function () use ($address, $userId) {
+            User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+            $shippingAddress = ShippingAddress::query()
+                ->whereKey($address)->where('user_id', $userId)
+                ->lockForUpdate()->firstOrFail();
+            $wasDefault = (bool) $shippingAddress->is_default_shipping;
+            $shippingAddress->delete(); // The last address may also be deleted.
 
-        return response()->json(['success' => true, 'message' => 'Shipping address deleted successfully.']);
+            if ($wasDefault) {
+                ShippingAddress::query()->where('user_id', $userId)
+                    ->update(['is_default_shipping' => false]);
+                $newDefault = ShippingAddress::query()->where('user_id', $userId)
+                    ->latest('id')->first();
+                if ($newDefault) {
+                    $newDefault->update(['is_default_shipping' => true]);
+                }
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipping address deleted successfully.',
+        ]);
     }
 
     public function setDefaultShipping(int $address): JsonResponse
     {
         $userId = (int) Auth::id();
 
-        $shippingAddress = ShippingAddress::query()
-            ->whereKey($address)
-            ->where('user_id', $userId)
-            ->firstOrFail();
-
-        ShippingAddress::query()->where('user_id', $userId)->update(['is_default_shipping' => false]);
-        $shippingAddress->update(['is_default_shipping' => true]);
-        $shippingAddress->refresh();
+        $shippingAddress = DB::transaction(function () use ($address, $userId) {
+            User::query()->whereKey($userId)->lockForUpdate()->firstOrFail();
+            $target = ShippingAddress::query()->whereKey($address)
+                ->where('user_id', $userId)->lockForUpdate()->firstOrFail();
+            ShippingAddress::query()->where('user_id', $userId)
+                ->update(['is_default_shipping' => false]);
+            $target->update(['is_default_shipping' => true]);
+            return $target->fresh();
+        });
 
         return response()->json([
             'success' => true,

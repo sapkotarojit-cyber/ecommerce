@@ -33,7 +33,6 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->favicon(asset('logo1.png'))
             ->login()
-            ->homeUrl('/')
             ->brandName('Empire Innovation')
             ->registration(\App\Filament\Pages\Auth\Register::class)
 

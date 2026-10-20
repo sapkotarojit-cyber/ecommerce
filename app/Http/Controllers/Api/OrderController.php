@@ -309,59 +309,54 @@ class OrderController extends Controller
     |
     */
 
-    public function tracking(int $id): JsonResponse
-    {
-        if ($id < 1) {
-            return response()->json([
-                'message' =>
-                    'Invalid order ID.',
-            ], 422);
-        }
 
-        $order = Order::query()
-            ->where(
-                'user_id',
-                Auth::id()
-            )
-            ->find($id);
+public function tracking(string $id): JsonResponse
+{
+    $identifier = trim($id);
 
-        if (! $order) {
-            return response()->json([
-                'message' =>
-                    'Order not found.',
-            ], 404);
-        }
-
+    if ($identifier === '' || strlen($identifier) > 100) {
         return response()->json([
-            'message' =>
-                'Order tracking retrieved successfully.',
-
-            'data' => [
-                'order_id' =>
-                    $order->id,
-
-                'tracking_number' =>
-                    $order->tracking_number,
-
-                'order_status' =>
-                    $order->order_status,
-
-                'payment_status' =>
-                    $order->payment_status,
-
-                'payment_method' =>
-                    $order->payment_method,
-
-                'created_at' =>
-                    $order->created_at,
-
-                'updated_at' =>
-                    $order->updated_at,
-            ],
-        ]);
+            'message' => 'Invalid tracking identifier.',
+        ], 422);
     }
 
-    /*
+    $query = Order::query()
+        ->where('user_id', Auth::id());
+
+    // Try the tracking number first, ignoring case and surrounding spaces.
+    $order = (clone $query)
+        ->whereRaw(
+            'LOWER(TRIM(tracking_number)) = ?',
+            [strtolower($identifier)]
+        )
+        ->first();
+
+    // If no tracking number matched, allow a numeric order ID.
+    if (!$order && ctype_digit($identifier)) {
+        $order = (clone $query)->find((int) $identifier);
+    }
+
+    if (!$order) {
+        return response()->json([
+            'message' => 'Order or tracking number not found.',
+        ], 404);
+    }
+
+    return response()->json([
+        'message' => 'Order tracking retrieved successfully.',
+        'data' => [
+            'order_id' => $order->id,
+            'tracking_number' => $order->tracking_number,
+            'order_status' => $order->order_status,
+            'payment_status' => $order->payment_status,
+            'payment_method' => $order->payment_method,
+            'created_at' => $order->created_at,
+            'updated_at' => $order->updated_at,
+        ],
+    ]);
+}
+
+/*
     |--------------------------------------------------------------------------
     | RETURN / CANCELLATION STATUS
     |--------------------------------------------------------------------------

@@ -468,6 +468,8 @@ class CheckoutController extends Controller
                         'payment_group_id' => $paymentGroupId,
                     ]);
 
+                    $cartRemovedForOrder = false;
+
                     foreach ($vendorItems as $item) {
                         $locked = $lockedVariants[$item->id];
 
@@ -504,7 +506,20 @@ class CheckoutController extends Controller
                             }
 
                             $item->delete();
+                        } elseif ($validated['payment_method'] === 'bank') {
+                            // Bank-transfer orders are successfully placed when this
+                            // checkout transaction commits. Remove only the selected
+                            // cart rows now; on transaction failure, the deletion rolls back.
+                            $item->delete();
+                            $cartRemovedForOrder = true;
                         }
+                    }
+
+                    if ($validated['payment_method'] === 'bank' && $cartRemovedForOrder) {
+                        // Lets failure/abandonment handlers restore these quantities once.
+                        $order->forceFill([
+                            'cart_removed_at' => now(),
+                        ])->save();
                     }
 
                     if ($validated['payment_method'] === 'cod') {
