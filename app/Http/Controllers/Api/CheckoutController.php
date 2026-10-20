@@ -8,6 +8,7 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\ProductVarient;
 use App\Models\ShippingAddress;
+use App\Services\ShippingFeeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,6 +38,25 @@ class CheckoutController extends Controller
      * Online payment confirmation must be handled by the corresponding
      * verified payment callback/admin approval endpoint.
      */
+    public function shippingQuote(Request $request, ShippingFeeService $shippingFees): JsonResponse
+    {
+        $validated = $this->validateStrict($request, [
+            'shipping_address_id' => ['required', 'integer', 'min:1'],
+        ]);
+        $address = ShippingAddress::query()
+            ->whereKey($validated['shipping_address_id'])
+            ->where('user_id', (int) $request->user()->id)
+            ->first();
+        if (!$address) {
+            return response()->json(['message' => 'The selected shipping address is invalid.'], 422);
+        }
+        try {
+            return response()->json($shippingFees->quote($address));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $this->validateStrict($request, [
@@ -119,11 +139,18 @@ class CheckoutController extends Controller
         }
 
         try {
+            $shippingQuote = app(ShippingFeeService::class)->quote($address);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        try {
             $result = DB::transaction(function () use (
                 $userId,
                 $address,
                 $validated,
-                $selectedCartItemIds
+                $selectedCartItemIds,
+                $shippingQuote
             ) {
                 /*
                  * Lock only this user's selected cart rows.
@@ -159,6 +186,7 @@ class CheckoutController extends Controller
                 );
 
                 $createdOrders = [];
+                $shippingAssigned = false;
 
                 $minimumQuantity = max(
                     1,
@@ -289,11 +317,15 @@ class CheckoutController extends Controller
                     /*
                      * Create the vendor-specific order.
                      */
+                    // One shipping charge per checkout: attach it to the first vendor order only.
+                    $orderShippingFee = $shippingAssigned ? 0.00 : (float) $shippingQuote['shipping_fee'];
+                    $shippingAssigned = true;
                     $order = Order::create([
                         'user_id' => $userId,
                         'dokan_id' => $dokanId,
                         'shipping_address_id' => $address->id,
-                        'total_amount' => $total,
+                        'shipping_fee' => $orderShippingFee,
+                        'total_amount' => round($total + $orderShippingFee, 2),
                         'status' => 'pending',
                         'order_status' => 'pending',
                         'payment_method' => $validated['payment_method'],
@@ -457,6 +489,10 @@ class CheckoutController extends Controller
             'payment_required' => !$isCod,
             'payment_method' => $validated['payment_method'],
             'payment_group_id' => $result['payment_group_id'],
+            'shipping_fee' => (float) $orders->sum(fn (Order $order) => (float) $order->shipping_fee),
+            'subtotal' => round((float) $orders->sum(fn (Order $order) => (float) $order->total_amount) - (float) $orders->sum(fn (Order $order) => (float) $order->shipping_fee), 2),
+            'total_amount' => round((float) $orders->sum(fn (Order $order) => (float) $order->total_amount), 2),
+            'shipping_zone' => $shippingQuote['zone'],
             'orders' => $orders,
         ], 201);
     }

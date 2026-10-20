@@ -6,7 +6,6 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use App\Http\Controllers\Frontend\AuthController;
 use App\Http\Controllers\Frontend\PageController;
 use App\Http\Controllers\Frontend\ShippingAddressController;
-use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\OrderController;
 use App\Http\Controllers\Frontend\CheckoutController;
@@ -212,6 +211,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/checkout', [CheckoutController::class, 'checkout'])
             ->name('checkout');
 
+        Route::post('/shipping-quote', [CheckoutController::class, 'shippingQuote'])
+            ->middleware('adaptive.rate:sensitive')
+            ->name('shipping-quote');
+
         Route::post('/cart/checkout-selected', [CheckoutController::class, 'postCheckoutSelected'])
             ->middleware('adaptive.rate:sensitive')
             ->name('cart.checkout.selected');
@@ -275,14 +278,6 @@ Route::middleware('auth')->group(function () {
 
 
 /* Payment Callbacks */
-
-/*
- * Short-lived signed URL used by the Flutter app to submit the server-signed
- * eSewa form. It deliberately does not require a browser login session.
- */
-Route::get('/payment/esewa/launch/{group}', [PaymentController::class, 'hostedEsewaForm'])
-    ->middleware('signed')
-    ->name('payments.esewa.hosted');
 
 Route::match(['get', 'post'], '/payment/esewa/success', [OrderController::class, 'esewaSuccess'])
     ->withoutMiddleware(VerifyCsrfToken::class)

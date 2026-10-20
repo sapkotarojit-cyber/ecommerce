@@ -15,6 +15,11 @@
                 {{ session('error') }}
             </div>
         @endif
+        @if(session('shipping_quote_error'))
+            <div class="mb-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-sm font-medium">
+                {{ session('shipping_quote_error') }}
+            </div>
+        @endif
 
         <form action="{{ route('orders.store') }}" method="POST" id="checkout-form">
             @csrf
@@ -39,7 +44,7 @@
     @if(isset($addresses) && $addresses->count() > 0)
         @foreach($addresses as $address)
             <label class="flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50">
-                <input type="radio" name="shipping_address_id" value="{{ $address->id }}" {{ $address->is_default_shipping ? 'checked' : '' }} class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1">
+                <input type="radio" name="shipping_address_id" value="{{ $address->id }}" {{ (int) ($selectedAddressId ?? 0) === (int) $address->id ? 'checked' : '' }} class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1" onchange="refreshShippingQuote()">
                 <div>
                     <p class="font-semibold text-gray-800">{{ $address->name }} <span class="text-xs font-normal text-gray-500">({{ $address->address_type }})</span></p>
                     <p class="text-sm text-gray-600">{{ $address->address }}</p>
@@ -126,9 +131,11 @@
     @endif
 </div>
 
-                        <div class="pt-4 border-t border-gray-200 flex justify-between items-center mb-6">
-                            <span class="text-base font-bold text-gray-900">Total Amount</span>
-                            <span class="text-xl font-extrabold text-indigo-600">Rs. {{ number_format($grandTotal ?? 0, 2) }}</span>
+                        <div class="pt-4 border-t border-gray-200 space-y-3 mb-6">
+                            <div class="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>Rs. {{ number_format($grandTotal ?? 0, 2) }}</span></div>
+                            <div class="flex justify-between text-sm text-gray-600"><span>Shipping (<span id="shipping-zone">{{ str_replace('_', ' ', $shippingZone ?? 'region not identified') }}</span>)</span><span id="shipping-fee">Rs. {{ number_format($shippingFee ?? 0, 2) }}</span></div>
+                            <p id="shipping-quote-error" class="hidden text-xs text-red-600"></p>
+                            <div class="flex justify-between items-center border-t border-gray-200 pt-3"><span class="text-base font-bold text-gray-900">Total Amount</span><span id="checkout-total" class="text-xl font-extrabold text-indigo-600">Rs. {{ number_format(($grandTotal ?? 0) + ($shippingFee ?? 0), 2) }}</span></div>
                         </div>
 
                         <button id="submit-order-btn" type="submit" class="w-full py-3.5 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-xl shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider" {{ $addresses->isEmpty() ? 'disabled' : '' }}>
@@ -189,9 +196,7 @@
 
                     <div class="mt-6 flex justify-end space-x-3">
                         <button type="button" @click="closeModal()" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 text-xs font-semibold uppercase tracking-wider">Cancel</button>
-                        <button type="submit" :disabled="savingAddress" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-xs uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed">
-                            <span x-text="savingAddress ? 'Saving...' : 'Save Address'">Save Address</span>
-                        </button>
+                        <button type="submit" :disabled="savingAddress" :class="{ 'opacity-50 cursor-not-allowed': savingAddress }" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold text-xs uppercase tracking-wider"><span x-text="savingAddress ? 'Saving...' : 'Save Address'"></span></button>
                     </div>
                 </form>
             </div>
@@ -200,6 +205,44 @@
 </div>
 
 <script>
+async function refreshShippingQuote() {
+    const selected = document.querySelector('input[name="shipping_address_id"]:checked');
+    const feeNode = document.getElementById('shipping-fee');
+    const zoneNode = document.getElementById('shipping-zone');
+    const totalNode = document.getElementById('checkout-total');
+    const errorNode = document.getElementById('shipping-quote-error');
+    const submit = document.getElementById('submit-order-btn');
+    if (!selected) return;
+    errorNode.classList.add('hidden');
+    feeNode.textContent = 'Calculating...';
+    submit.disabled = true;
+    try {
+        const response = await fetch("{{ route('orders.shipping-quote') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': "{{ csrf_token() }}"
+            },
+            body: JSON.stringify({shipping_address_id: Number(selected.value)})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Unable to calculate shipping for this address.');
+        const fee = Number(data.shipping_fee);
+        if (!Number.isFinite(fee) || fee < 0) throw new Error('The server returned an invalid shipping fee.');
+        feeNode.textContent = 'Rs. ' + fee.toFixed(2);
+        zoneNode.textContent = String(data.zone || '').replaceAll('_', ' ');
+        totalNode.textContent = 'Rs. ' + ({{ (float) ($grandTotal ?? 0) }} + fee).toFixed(2);
+        submit.disabled = false;
+    } catch (error) {
+        feeNode.textContent = 'Unavailable';
+        zoneNode.textContent = 'not available';
+        errorNode.textContent = error.message || 'Unable to calculate shipping.';
+        errorNode.classList.remove('hidden');
+        submit.disabled = true;
+    }
+}
+document.addEventListener('DOMContentLoaded', refreshShippingQuote);
 function checkoutPage() {
     return {
         showAddressModal: false,
@@ -211,77 +254,110 @@ function checkoutPage() {
             region: '',
             address: ''
         },
+
         openModal() {
             this.showAddressModal = true;
         },
+
         closeModal() {
+            if (this.savingAddress) return;
             this.showAddressModal = false;
-            this.form = { name: '', address_type: '', phone: '', region: '', address: '' };
+            this.form = {
+                name: '',
+                address_type: '',
+                phone: '',
+                region: '',
+                address: ''
+            };
         },
+
         async saveAddress() {
             if (this.savingAddress) return;
             this.savingAddress = true;
 
             try {
                 const response = await fetch("{{ route('shipping-address.quick-store') }}", {
-                    method: "POST",
+                    method: 'POST',
                     headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": "{{ csrf_token() }}",
-                        "X-Requested-With": "XMLHttpRequest",
-                        "Accept": "application/json"
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': "{{ csrf_token() }}",
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(this.form)
                 });
 
-                const data = await response.json().catch(() => ({}));
-                if (!response.ok || !data.success || !data.address) {
-                    alert(data.message || 'Unable to save the shipping address. Please check the details and try again.');
-                    return;
+                const data = await response.json();
+
+                if (!response.ok || !data.success || !data.address || !data.address.id) {
+                    let message = data.message || 'Unable to save shipping address.';
+                    if (data.errors) {
+                        message = Object.values(data.errors).flat().join('\n');
+                    }
+                    throw new Error(message);
                 }
 
                 const address = data.address;
                 const container = document.getElementById('address-list-container');
-                const existingRadio = container.querySelector(`input[name="shipping_address_id"][value="${Number(address.id)}"]`);
+                if (!container) {
+                    throw new Error('Could not find the shipping address list. Please reload checkout.');
+                }
 
-                if (existingRadio) {
-                    existingRadio.checked = true;
-                } else {
+                // Do not append a second card if this address is already in the list.
+                let radio = Array.from(container.querySelectorAll('input[name="shipping_address_id"]'))
+                    .find(input => input.value === String(address.id));
+
+                if (!radio) {
                     const label = document.createElement('label');
                     label.className = 'flex items-start space-x-3 p-4 border rounded-lg cursor-pointer bg-gray-50/50';
 
-                    const radio = document.createElement('input');
+                    radio = document.createElement('input');
                     radio.type = 'radio';
                     radio.name = 'shipping_address_id';
                     radio.value = String(address.id);
-                    radio.checked = true;
-                    radio.required = true;
                     radio.className = 'h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 mt-1';
+                    radio.required = true;
+                    radio.addEventListener('change', refreshShippingQuote);
 
                     const details = document.createElement('div');
-                    const title = document.createElement('p');
-                    title.className = 'font-semibold text-gray-800';
-                    title.textContent = `${address.name} (${address.address_type})`;
-                    const line1 = document.createElement('p');
-                    line1.className = 'text-sm text-gray-600';
-                    line1.textContent = address.address;
-                    const line2 = document.createElement('p');
-                    line2.className = 'text-sm text-gray-600';
-                    line2.textContent = `${address.region} | Phone: ${address.phone}`;
+                    const nameLine = document.createElement('p');
+                    nameLine.className = 'font-semibold text-gray-800';
+                    nameLine.append(document.createTextNode(address.name || ''));
 
-                    details.append(title, line1, line2);
+                    const type = document.createElement('span');
+                    type.className = 'text-xs font-normal text-gray-500';
+                    type.textContent = ` (${address.address_type || ''})`;
+                    nameLine.appendChild(type);
+
+                    const addressLine = document.createElement('p');
+                    addressLine.className = 'text-sm text-gray-600';
+                    addressLine.textContent = address.address || '';
+
+                    const regionLine = document.createElement('p');
+                    regionLine.className = 'text-sm text-gray-600';
+                    regionLine.textContent = `${address.region || ''} | Phone: ${address.phone || ''}`;
+
+                    details.append(nameLine, addressLine, regionLine);
                     label.append(radio, details);
                     container.appendChild(label);
                 }
 
                 container.classList.remove('hidden');
-                document.getElementById('no-address-msg')?.classList.add('hidden');
-                document.getElementById('submit-order-btn')?.removeAttribute('disabled');
+                const emptyMessage = document.getElementById('no-address-msg');
+                if (emptyMessage) emptyMessage.classList.add('hidden');
 
-                this.closeModal();
-                alert(data.message || 'Shipping address has been added successfully.');
+                // Select it so shipping is quoted for the correct address.
+                radio.checked = true;
+                this.showAddressModal = false;
+                this.form = { name: '', address_type: '', phone: '', region: '', address: '' };
+
+                alert(data.created === false
+                    ? 'This shipping address already exists and has been selected.'
+                    : (data.message || 'Shipping address has been created successfully.'));
+
+                await refreshShippingQuote();
             } catch (error) {
-                alert('Unable to save the shipping address. Please check your connection and try again.');
+                console.error('Error saving shipping address:', error);
+                alert(error.message || 'An error occurred while saving the shipping address. Please try again.');
             } finally {
                 this.savingAddress = false;
             }

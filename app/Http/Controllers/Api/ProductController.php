@@ -10,9 +10,7 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    /**
-     * Product listing.
-     */
+    /** Product listing. */
     public function index(Request $request): JsonResponse
     {
         $validated = $this->validateStrict($request, [
@@ -20,23 +18,12 @@ class ProductController extends Controller
                 'sometimes',
                 'integer',
                 'min:1',
-                'max:' . config(
-                    'security.validation.pagination.max_page',
-                    1000
-                ),
+                'max:' . config('security.validation.pagination.max_page', 1000),
             ],
         ]);
 
         $page = (int) ($validated['page'] ?? 1);
-
-        $perPage = max(
-            1,
-            (int) config(
-                'security.validation.pagination.products_per_page',
-                12
-            )
-        );
-
+        $perPage = max(1, (int) config('security.validation.pagination.products_per_page', 12));
         $key = 'products:list:' . hash('sha256', $request->fullUrl());
 
         $payload = app(CatalogCache::class)->remember(
@@ -49,12 +36,7 @@ class ProductController extends Controller
                         'varients:id,product_id,title,images,price,discount,qty',
                     ])
                     ->latest('products.created_at')
-                    ->paginate(
-                        $perPage,
-                        ['*'],
-                        'page',
-                        $page
-                    );
+                    ->paginate($perPage, ['*'], 'page', $page);
 
                 return [
                     'success' => true,
@@ -80,9 +62,7 @@ class ProductController extends Controller
         return response()->json($payload);
     }
 
-    /**
-     * Display a single product.
-     */
+    /** Display a single product. */
     public function show(int $id): JsonResponse
     {
         if ($id < 1) {
@@ -124,99 +104,48 @@ class ProductController extends Controller
         return response()->json($payload);
     }
 
-    /**
-     * Public-safe product representation.
-     */
-    private function productData(
-        Product $product
-    ): array {
-        $vendor = $product->dokan;
+    /** Public-safe product representation. */
+    private function productData(Product $product): array
+    {
+        // The products table has a legacy string column named "category".
+        // Use the loaded relationship directly to avoid the property collision.
+        $category = $product->getRelation('category');
+        $vendor = $product->getRelation('dokan');
+        $variants = $product->getRelation('varients');
 
         return [
-            'id' =>
-                $product->id,
-
-            'category_id' =>
-                $product->category_id,
-
-            'title' =>
-                $product->title,
-
-            'description' =>
-                $product->description,
-
-            'dokan_id' =>
-                $product->dokan_id,
-
-            'category' =>
-                $product->category
-                    ? [
-                        'id' =>
-                            $product->category->id,
-
-                        'name' =>
-                            $product->category->name,
-
-                        'slug' =>
-                            $product->category->slug,
-
-                        'is_active' =>
-                            (bool) $product->category->is_active,
-                    ]
-                    : null,
-
-            'dokan' =>
-                $vendor
-                    ? [
-                        'id' =>
-                            $vendor->id,
-
-                        'name' =>
-                            $vendor->name,
-
-                        'company_name' =>
-                            $vendor->company_name,
-
-                        'logo' =>
-                            $vendor->logo,
-
-                        'status' =>
-                            $vendor->status,
-                    ]
-                    : null,
-
-            'varients' =>
-                $product->varients
-                    ->map(
-                        function ($variant): array {
-                            return [
-                                'id' =>
-                                    $variant->id,
-
-                                'product_id' =>
-                                    $variant->product_id,
-
-                                'title' =>
-                                    $variant->title,
-
-                                'images' =>
-                                    is_array($variant->images)
-                                        ? $variant->images
-                                        : [],
-
-                                'price' =>
-                                    (float) $variant->price,
-
-                                'discount' =>
-                                    (float) $variant->discount,
-
-                                'qty' =>
-                                    (int) $variant->qty,
-                            ];
-                        }
-                    )
-                    ->values()
-                    ->all(),
+            'id' => $product->id,
+            'category_id' => $product->category_id,
+            'title' => $product->title,
+            'description' => $product->description,
+            'dokan_id' => $product->dokan_id,
+            'category' => $category ? [
+                'id' => $category->id,
+                'name' => $category->name,
+                'slug' => $category->slug,
+                'is_active' => (bool) $category->is_active,
+            ] : null,
+            'dokan' => $vendor ? [
+                'id' => $vendor->id,
+                'name' => $vendor->name,
+                'company_name' => $vendor->company_name,
+                'logo' => $vendor->logo,
+                'status' => $vendor->status,
+            ] : null,
+            'varients' => $variants
+                ->map(function ($variant): array {
+                    return [
+                        'id' => $variant->id,
+                        'product_id' => $variant->product_id,
+                        'title' => $variant->title,
+                        'images' => is_array($variant->images) ? $variant->images : [],
+                        'price' => (float) $variant->price,
+                        'discount' => (float) $variant->discount,
+                        'qty' => (int) $variant->qty,
+                    ];
+                })
+                ->values()
+                ->all(),
         ];
     }
 }

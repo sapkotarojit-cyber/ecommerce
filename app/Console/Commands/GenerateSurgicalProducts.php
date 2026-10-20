@@ -16,7 +16,7 @@ class GenerateSurgicalProducts extends Command
 
     public function handle(): int
     {
-        $count = max(100, (int) $this->argument('count'));
+        $count = max(1, (int) $this->argument('count'));
 
         if (!extension_loaded('gd')) {
             $this->error('PHP GD extension is required.');

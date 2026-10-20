@@ -208,6 +208,10 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
+    Route::post('/checkout/shipping-quote', [CheckoutController::class, 'shippingQuote'])
+        ->middleware('adaptive.rate:sensitive')
+        ->name('api.checkout.shipping-quote');
+
     Route::post('/checkout', [CheckoutController::class, 'store'])
         ->middleware('adaptive.rate:sensitive')
         ->name('api.checkout');

@@ -64,15 +64,42 @@
 
                     @php
                         $variantOptions = $product->varients->map(function ($variant) {
-                            $variantImages = is_array($variant->images) ? $variant->images : [];
-                            $firstImage = $variantImages[0] ?? null;
-                            $imageUrl = null;
+                            $rawImages = $variant->images;
 
-                            if (is_string($firstImage) && $firstImage !== '') {
-                                $imageUrl = filter_var($firstImage, FILTER_VALIDATE_URL)
-                                    ? $firstImage
-                                    : asset('storage/' . ltrim($firstImage, '/'));
+                            if (is_array($rawImages)) {
+                                $parsedImages = $rawImages;
+                            } elseif (is_string($rawImages)) {
+                                $decoded = json_decode($rawImages, true);
+                                $parsedImages = is_array($decoded)
+                                    ? $decoded
+                                    : [$rawImages];
+                            } else {
+                                $parsedImages = [];
                             }
+
+                            $variantImages = collect($parsedImages)
+                                ->filter(fn ($image) => is_string($image) && trim($image) !== '')
+                                ->map(function ($image) {
+                                    $image = trim($image, " \t\n\r\0\x0B\"'");
+
+                                    if ($image === '') {
+                                        return null;
+                                    }
+
+                                    if (filter_var($image, FILTER_VALIDATE_URL)) {
+                                        return $image;
+                                    }
+
+                                    $image = ltrim($image, '/');
+
+                                    return str_starts_with($image, 'storage/')
+                                        ? asset($image)
+                                        : asset('storage/' . $image);
+                                })
+                                ->filter()
+                                ->unique()
+                                ->values()
+                                ->all();
 
                             return [
                                 'id' => (int) $variant->id,
@@ -80,52 +107,51 @@
                                 'price' => (float) $variant->price,
                                 'discount' => (float) $variant->discount,
                                 'qty' => (int) $variant->qty,
-                                'image_url' => $imageUrl,
+                                'images' => $variantImages,
+                                'image_url' => $variantImages[0] ?? null,
                             ];
                         })->values();
                     @endphp
 
-                    <!-- Main Image -->
+                    <!-- Variant Image Gallery -->
                     <div class="mb-4 h-96 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-
-                        @if(!empty($images))
-                            <img
-                                id="main-image"
-                                src="{{ asset('storage/' . $images[0]) }}"
-                                alt="{{ $product->title }}"
-                                class="w-full h-full object-cover"
-                            >
-                        @else
-                            <div class="text-center text-gray-400">
-                                <i class="fas fa-image text-5xl mb-2"></i>
-                                <p>No image available</p>
-                            </div>
-                        @endif
-
+                        <img
+                            id="main-image"
+                            x-show="activeImage"
+                            :src="activeImage"
+                            alt="{{ $product->title }}"
+                            class="w-full h-full object-contain"
+                        >
+                        <div x-show="!activeImage" class="text-center text-gray-400">
+                            <i class="fas fa-image text-5xl mb-2"></i>
+                            <p>No image available</p>
+                        </div>
                     </div>
 
-                    <!-- Thumbnails -->
-                    @if(count($images) > 1)
-                        <div class="flex gap-2 overflow-x-auto pb-2">
-
-                            @foreach($images as $image)
-
-                                <button
-                                    type="button"
-                                    onclick="document.getElementById('main-image').src='{{ asset('storage/' . $image) }}'"
-                                    class="w-20 h-20 rounded-lg overflow-hidden border-2 border-transparent hover:border-[#c9a84c] flex-shrink-0"
+                    <div
+                        x-show="galleryImages.length > 0"
+                        class="flex gap-2 overflow-x-auto pb-2"
+                    >
+                        <template x-for="(image, index) in galleryImages" :key="image">
+                            <button
+                                type="button"
+                                @click="activeImage = image"
+                                :aria-label="'View product image ' + (index + 1)"
+                                :aria-pressed="activeImage === image"
+                                class="w-20 h-20 rounded-lg overflow-hidden border-2 flex-shrink-0"
+                                :class="activeImage === image
+                                    ? 'border-[#c9a84c]'
+                                    : 'border-transparent hover:border-[#c9a84c]'"
+                            >
+                                <img
+                                    :src="image"
+                                    alt="Product thumbnail"
+                                    class="w-full h-full object-contain"
+                                    loading="lazy"
                                 >
-                                    <img
-                                        src="{{ asset('storage/' . $image) }}"
-                                        alt="Thumbnail"
-                                        class="w-full h-full object-cover"
-                                    >
-                                </button>
-
-                            @endforeach
-
-                        </div>
-                    @endif
+                            </button>
+                        </template>
+                    </div>
 
                 </div>
 
@@ -153,41 +179,61 @@
                         </h1>
 
                         <!-- Price updates whenever a different variant is selected -->
-                        @if($firstVariant)
-                            <div class="mb-5">
-                                <label for="product-variant-select" class="block text-sm font-semibold text-gray-700 mb-2">
-                                    Available variants ({{ $product->varients->count() }})
+
+                    <!-- Daraz-style variant selector -->
+                    @if($firstVariant)
+                        <div class="mt-5 mb-5">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <label class="text-sm font-bold text-gray-800">
+                                    Choose a variant
                                 </label>
-                                <select
-                                    id="product-variant-select"
-                                    x-model="varient_id"
-                                    @change="selectVariant()"
-                                    class="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#c9a84c] focus:border-[#c9a84c]"
-                                >
-                                    <template x-for="variant in variants" :key="variant.id">
-                                        <option
-                                            :value="String(variant.id)"
-                                            x-text="variant.title + ' — Rs. ' + formatPrice(variant.price - (variant.price * variant.discount / 100)) + (variant.qty < 1 ? ' (Out of stock)' : '')"
-                                        ></option>
-                                    </template>
-                                </select>
+                                <span class="text-xs text-gray-500">
+                                    {{ $product->varients->count() }} options
+                                </span>
                             </div>
 
-                            <div class="mb-6">
-                                <div class="flex items-baseline flex-wrap gap-3">
-                                    <span class="text-2xl font-bold text-[#1a2a6c]"
-                                          x-text="'Rs. ' + formatPrice(currentPrice - (currentPrice * currentDiscount / 100))"></span>
-                                    <span x-show="currentDiscount > 0"
-                                          x-text="'Rs. ' + formatPrice(currentPrice)"
-                                          class="text-gray-400 line-through"></span>
-                                    <span x-show="currentDiscount > 0"
-                                          x-text="currentDiscount + '% OFF'"
-                                          class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-semibold"></span>
-                                </div>
-                                <p class="mt-2 text-sm text-gray-500"
-                                   x-text="currentQty > 0 ? currentQty + ' in stock' : 'Currently out of stock'"></p>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <template x-for="variant in variants" :key="variant.id">
+                                    <button
+                                        type="button"
+                                        @click="varient_id = String(variant.id); selectVariant()"
+                                        :disabled="Number(variant.qty) < 1"
+                                        :aria-pressed="String(varient_id) === String(variant.id)"
+                                        :class="String(varient_id) === String(variant.id)
+                                            ? 'border-[#c9a84c] bg-[#fffaf0] ring-2 ring-[#c9a84c]/30'
+                                            : 'border-gray-200 bg-white hover:border-[#c9a84c]'"
+                                        class="relative min-w-0 rounded-xl border-2 p-3 text-left transition duration-150 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        <span
+                                            x-show="String(varient_id) === String(variant.id)"
+                                            class="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-[#c9a84c] text-xs font-bold text-white"
+                                            aria-hidden="true"
+                                        >✓</span>
+
+                                        <span
+                                            class="block break-words pr-5 text-sm font-semibold text-gray-800"
+                                            x-text="variant.title"
+                                        ></span>
+
+                                        <span
+                                            class="mt-2 block text-base font-bold text-[#1a2a6c]"
+                                            x-text="'Rs. ' + formatPrice(variant.price - (variant.price * variant.discount / 100))"
+                                        ></span>
+
+                                        <span
+                                            class="mt-1 block text-xs font-medium"
+                                            :class="Number(variant.qty) > 0 ? 'text-green-700' : 'text-red-600'"
+                                            x-text="Number(variant.qty) > 0 ? 'In stock: ' + variant.qty : 'Out of stock'"
+                                        ></span>
+                                    </button>
+                                </template>
                             </div>
-                        @endif
+
+                            <p class="mt-2 text-xs text-gray-500">
+                                Select an option to update the price and product details.
+                            </p>
+                        </div>
+                    @endif
 
                         <!-- Description -->
                         <div class="border-t border-b border-gray-100 py-4 my-4 text-gray-600 leading-relaxed">
@@ -486,6 +532,9 @@ function cartComponent() {
     return {
         varient_id: "{{ $firstVariant?->id }}",
         variants: @json($variantOptions),
+        galleryImages: @json($variantOptions->first()['images'] ?? []),
+        activeImage: @json($variantOptions->first()['images'][0] ?? ''),
+
         currentPrice: {{ (float) ($firstVariant?->price ?? 0) }},
         currentDiscount: {{ (float) ($firstVariant?->discount ?? 0) }},
         currentQty: {{ (int) ($firstVariant?->qty ?? 0) }},
@@ -510,21 +559,8 @@ function cartComponent() {
             this.currentQty = Number(variant.qty || 0);
             this.qty = Math.max(1, Math.min(Number(this.qty || 1), Math.max(1, this.currentQty)));
 
-            if (variant.image_url) {
-                let image = document.getElementById('main-image');
-                if (!image) {
-                    const gallery = document.querySelector('.mb-4.h-96');
-                    if (gallery) {
-                        gallery.replaceChildren();
-                        image = document.createElement('img');
-                        image.id = 'main-image';
-                        image.alt = @json($product->title);
-                        image.className = 'w-full h-full object-cover';
-                        gallery.appendChild(image);
-                    }
-                }
-                if (image) image.src = variant.image_url;
-            }
+            this.galleryImages = Array.isArray(variant.images) ? variant.images : [];
+            this.activeImage = this.galleryImages[0] || variant.image_url || '';
         },
 
         async addToCart() {

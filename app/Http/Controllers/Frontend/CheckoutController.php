@@ -8,6 +8,7 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\ProductVarient;
 use App\Models\ShippingAddress;
+use App\Services\ShippingFeeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -118,6 +119,23 @@ class CheckoutController extends Controller
 
         $vendorTotal = [];
         $grandTotal = 0.0;
+        $shippingFee = 0.0;
+        $shippingZone = null;
+        $selectedAddressId = request('shipping_address_id')
+            ?: optional($addresses->firstWhere('is_default_shipping', true))->id
+            ?: optional($addresses->first())->id;
+        if ($selectedAddressId) {
+            $selectedAddress = $addresses->firstWhere('id', (int) $selectedAddressId);
+            if ($selectedAddress) {
+                try {
+                    $quote = app(ShippingFeeService::class)->quote($selectedAddress);
+                    $shippingFee = (float) $quote['shipping_fee'];
+                    $shippingZone = $quote['zone'];
+                } catch (\RuntimeException $e) {
+                    session()->flash('shipping_quote_error', $e->getMessage());
+                }
+            }
+        }
 
         foreach ($cartItems as $item) {
             if (! $item->product || ! $item->varient) {
@@ -158,9 +176,32 @@ class CheckoutController extends Controller
                 'cartItems',
                 'addresses',
                 'vendorTotal',
-                'grandTotal'
+                'grandTotal',
+                'shippingFee',
+                'shippingZone',
+                'selectedAddressId'
             )
         );
+    }
+
+    /** Return a server-calculated shipping quote for the current user's address. */
+    public function shippingQuote(Request $request)
+    {
+        $validated = $this->validateStrict($request, [
+            'shipping_address_id' => ['required', 'integer', 'min:1'],
+        ]);
+        $address = ShippingAddress::query()
+            ->whereKey($validated['shipping_address_id'])
+            ->where('user_id', (int) Auth::id())
+            ->first();
+        if (! $address) {
+            return response()->json(['message' => 'The selected shipping address is invalid.'], 422);
+        }
+        try {
+            return response()->json(app(ShippingFeeService::class)->quote($address));
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
     }
 
     /**
@@ -228,6 +269,11 @@ class CheckoutController extends Controller
                 ->route('orders.checkout')
                 ->with('error', 'The selected shipping address is invalid.');
         }
+        try {
+            $shippingQuote = app(ShippingFeeService::class)->quote($address);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('orders.checkout')->with('error', $e->getMessage());
+        }
 
         /*
          * Reuse an existing pending online checkout when the customer
@@ -262,6 +308,7 @@ class CheckoutController extends Controller
                     ->where('user_id', $userId)
                     ->where('payment_group_id', $existingGroupId)
                     ->where('payment_method', $validated['payment_method'])
+                    ->where('shipping_address_id', $address->id)
                     ->where('payment_status', 'pending')
                     ->orderBy('id')
                     ->get();
@@ -280,7 +327,8 @@ class CheckoutController extends Controller
                 $ids,
                 $address,
                 $validated,
-                $userId
+                $userId,
+                $shippingQuote
             ) {
                 $items = Cart::query()
                     ->where('user_id', $userId)
@@ -306,6 +354,7 @@ class CheckoutController extends Controller
                 );
 
                 $createdOrders = [];
+                $shippingAssigned = false;
 
                 foreach ($itemsByVendor as $dokanId => $vendorItems) {
                     $dokanId = (int) $dokanId;
@@ -403,11 +452,15 @@ class CheckoutController extends Controller
                         );
                     }
 
+                    // Charge shipping once across the vendor orders in this checkout.
+                    $orderShippingFee = $shippingAssigned ? 0.00 : (float) $shippingQuote['shipping_fee'];
+                    $shippingAssigned = true;
                     $order = Order::create([
                         'user_id' => $userId,
                         'dokan_id' => $dokanId,
                         'shipping_address_id' => $address->id,
-                        'total_amount' => $total,
+                        'shipping_fee' => $orderShippingFee,
+                        'total_amount' => round($total + $orderShippingFee, 2),
                         'status' => 'pending',
                         'order_status' => 'pending',
                         'payment_method' => $validated['payment_method'],
@@ -433,8 +486,11 @@ class CheckoutController extends Controller
                             ),
                         ]);
 
-                        // COD reserves stock immediately. Online payments reserve
-                        // stock only after payment is independently verified.
+                        /*
+                         * Only COD finalizes stock/cart during checkout.
+                         * Online payment is finalized after gateway/admin
+                         * verification in the corresponding payment handler.
+                         */
                         if ($validated['payment_method'] === 'cod') {
                             $updated = ProductVarient::query()
                                 ->whereKey($variant->id)
@@ -446,25 +502,10 @@ class CheckoutController extends Controller
                                     'Stock changed during checkout. Please review your cart and try again.'
                                 );
                             }
-                        }
 
-                        // Remove purchased cart rows for every payment method.
-                        // Cancellation/definitive failure restores them once.
-                        $deleted = Cart::query()
-                            ->whereKey($item->id)
-                            ->where('user_id', $userId)
-                            ->delete();
-
-                        if ($deleted !== 1) {
-                            throw new \RuntimeException(
-                                'A selected cart item changed during checkout. Please try again.'
-                            );
+                            $item->delete();
                         }
                     }
-
-                    $order->forceFill([
-                        'cart_removed_at' => now(),
-                    ])->save();
 
                     if ($validated['payment_method'] === 'cod') {
                         $order->forceFill([
